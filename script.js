@@ -303,17 +303,36 @@ const SIGNALS = {
 // ─────────────────────────────────────────────
 // ANALYSIS DETECTION PATTERNS
 // ─────────────────────────────────────────────
+// ─────────────────────────────────────────────
+// ANALYSIS PATTERNS
+// Handles two common label formats:
+//   Standard:  "Crude Protein (min.) 14.0%"
+//   Dot-fill:  "Crude Protein...Minimum...14.00%"
+// The separator group [^0-9\n]{0,40} matches both.
+// ─────────────────────────────────────────────
 const ANALYSIS_PATTERNS = [
-  { key: 'protein',    label: 'Crude Protein',   regex: /crude\s*protein[^0-9]*([0-9]+\.?[0-9]*)\s*%/i },
-  { key: 'fat',        label: 'Crude Fat',        regex: /crude\s*fat[^0-9]*([0-9]+\.?[0-9]*)\s*%/i },
-  { key: 'fiber',      label: 'Crude Fiber',      regex: /crude\s*fiber[^0-9]*([0-9]+\.?[0-9]*)\s*%/i },
-  { key: 'calcium',    label: 'Calcium (min)',     regex: /calcium[^0-9\n]*?min[^0-9]*([0-9]+\.?[0-9]*)\s*%/i },
-  { key: 'phosphorus', label: 'Phosphorus',        regex: /phosphorus[^0-9]*([0-9]+\.?[0-9]*)\s*%/i },
-  { key: 'nsc',        label: 'NSC',              regex: /nsc[^0-9]*([0-9]+\.?[0-9]*)\s*%/i },
-  { key: 'sugar',      label: 'Sugar',            regex: /sugar[^0-9]*([0-9]+\.?[0-9]*)\s*%/i },
-  { key: 'starch',     label: 'Starch',           regex: /starch[^0-9]*([0-9]+\.?[0-9]*)\s*%/i },
-  { key: 'vitE',       label: 'Vitamin E',        regex: /vitamin\s*e[^0-9]*([0-9]+\.?[0-9]*)\s*iu/i },
-  { key: 'selenium',   label: 'Selenium',         regex: /selenium[^0-9]*([0-9]+\.?[0-9]*)\s*(mg|ppm)/i }
+  { key: 'protein',    label: 'Crude Protein',   regex: /crude\s*protein[^0-9\n]{0,40}([0-9]+\.?[0-9]*)\s*%/i },
+  { key: 'fat',        label: 'Crude Fat',        regex: /crude\s*fat[^0-9\n]{0,40}([0-9]+\.?[0-9]*)\s*%/i },
+  { key: 'fiber',      label: 'Crude Fiber',      regex: /crude\s*fiber[^0-9\n]{0,40}([0-9]+\.?[0-9]*)\s*%/i },
+  { key: 'calcium',    label: 'Calcium (min)',     regex: /calcium[^0-9\n]{0,40}(?:min[^0-9\n]{0,20})?([0-9]+\.?[0-9]*)\s*%/i },
+  { key: 'phosphorus', label: 'Phosphorus',        regex: /phosphorus[^0-9\n]{0,40}([0-9]+\.?[0-9]*)\s*%/i },
+  { key: 'magnesium',  label: 'Magnesium',         regex: /magnesium[^0-9\n]{0,40}([0-9]+\.?[0-9]*)\s*%/i },
+  { key: 'potassium',  label: 'Potassium',         regex: /potassium[^0-9\n]{0,40}([0-9]+\.?[0-9]*)\s*%/i },
+  { key: 'nsc',        label: 'NSC',               regex: /\bnsc\b[^0-9\n]{0,40}([0-9]+\.?[0-9]*)\s*%/i },
+  { key: 'sugar',      label: 'Sugar',             regex: /(?:water\s*soluble\s*carb|\bwsc\b|\bsugar\b)[^0-9\n]{0,40}([0-9]+\.?[0-9]*)\s*%/i },
+  { key: 'starch',     label: 'Starch',            regex: /\bstarch\b[^0-9\n]{0,40}([0-9]+\.?[0-9]*)\s*%/i },
+  { key: 'adf',        label: 'ADF',               regex: /\badf\b[^0-9\n]{0,40}([0-9]+\.?[0-9]*)\s*%/i },
+  { key: 'ndf',        label: 'NDF',               regex: /\bndf\b[^0-9\n]{0,40}([0-9]+\.?[0-9]*)\s*%/i },
+  { key: 'lysine',     label: 'Lysine',            regex: /\blysine\b[^0-9\n]{0,40}([0-9]+\.?[0-9]*)\s*%/i },
+  { key: 'vitA',       label: 'Vitamin A',         regex: /vitamin\s*a[^0-9\n]{0,40}([0-9]+\.?[0-9]*)\s*iu/i },
+  { key: 'vitD',       label: 'Vitamin D',         regex: /vitamin\s*d[^0-9\n]{0,40}([0-9]+\.?[0-9]*)\s*iu/i },
+  { key: 'vitE',       label: 'Vitamin E',         regex: /vitamin\s*e[^0-9\n]{0,40}([0-9]+\.?[0-9]*)\s*iu/i },
+  { key: 'selenium',   label: 'Selenium',          regex: /selenium[^0-9\n]{0,40}([0-9]+\.?[0-9]*)\s*(?:mg|ppm)/i },
+  { key: 'zinc',       label: 'Zinc',              regex: /\bzinc\b[^0-9\n]{0,40}([0-9]+\.?[0-9]*)\s*(?:mg|ppm)/i },
+  { key: 'copper',     label: 'Copper',            regex: /\bcopper\b[^0-9\n]{0,40}([0-9]+\.?[0-9]*)\s*(?:mg|ppm)/i },
+  { key: 'manganese',  label: 'Manganese',         regex: /manganese[^0-9\n]{0,40}([0-9]+\.?[0-9]*)\s*(?:mg|ppm)/i },
+  { key: 'iron',       label: 'Iron',              regex: /\biron\b[^0-9\n]{0,40}([0-9]+\.?[0-9]*)\s*(?:mg|ppm)/i },
+  { key: 'biotin',     label: 'Biotin',            regex: /biotin[^0-9\n]{0,40}([0-9]+\.?[0-9]*)\s*mg/i }
 ];
 
 // ─────────────────────────────────────────────
@@ -1446,14 +1465,10 @@ function decodeLabel(text) {
         notes.push(`Selenium ingredient detected in the list (${srcNames} — ${srcType}) but no ppm value found in the guaranteed analysis. Ask the manufacturer for the selenium level in mg/kg or ppm.`);
       }
     }
-    if (/iron/i.test(text)) {
-      const ironMatch = text.match(/iron[^0-9]*([0-9]+\.?[0-9]*)\s*ppm/i);
-      if (ironMatch) {
-        notes.push(`Iron listed at ${ironMatch[1]} ppm. High iron in feed can interfere with copper and zinc absorption. If your hay is also high in iron (common in many regions), total iron load is worth discussing with your vet or nutritionist.`);
-      }
-    }
-    if (/lysine|methionine|threonine/i.test(text)) {
-      notes.push(`Individual amino acids (lysine, methionine, threonine) are listed in the guaranteed analysis. This indicates the manufacturer is guaranteeing specific amino acid levels — a sign of a more precisely formulated feed focused on protein quality, not just crude protein quantity.`);
+    // Iron note — now handled in the Guaranteed Analysis section
+    // Amino acid quality note — moved to protein card; keep short reference here
+    if (analysis.lysine || /methionine|threonine/i.test(text)) {
+      notes.push(`Individual amino acids are guaranteed in the analysis panel — a sign of a feed focused on protein quality, not just crude protein percentage.`);
     }
     vitHTML = vparts.join('<br>') + (notes.length ? '<br><br>' + notes.join('<br><br>') : '') + (redFlagsHTML ? '<br><br>' + redFlagsHTML : '');
   } else {
@@ -1606,25 +1621,48 @@ function decodeLabel(text) {
   }
 
   // Extra analysis values
+  // ── Extra analysis values — now all pulled from the ANALYSIS_PATTERNS results
+  // where available, falling back to direct regex only for fields not in patterns
   const extraAnalysis = [];
-  const lysinePct = text.match(/lysine[^0-9]*([0-9]+\.?[0-9]*)\s*%/i);
-  if (lysinePct) extraAnalysis.push(`Lysine: ${lysinePct[1]}% (min) — an essential amino acid horses cannot synthesize. Listed individually, which is a quality indicator.`);
-  const magMatch = text.match(/magnesium[^0-9]*([0-9]+\.?[0-9]*)\s*%/i);
-  if (magMatch) extraAnalysis.push(`Magnesium: ${magMatch[1]}% (min) — important for muscle function and nerve signaling.`);
-  const potMatch = text.match(/potassium[^0-9]*([0-9]+\.?[0-9]*)\s*%/i);
-  if (potMatch) extraAnalysis.push(`Potassium: ${potMatch[1]}% (min) — an electrolyte important for sweating horses.`);
-  const manMatch = text.match(/manganese[^0-9]*([0-9]+\.?[0-9]*)\s*ppm/i);
-  if (manMatch) extraAnalysis.push(`Manganese: ${manMatch[1]} ppm (min) — supports bone development and enzyme function.`);
-  const ironMatch = text.match(/iron[^0-9]*([0-9]+\.?[0-9]*)\s*ppm/i);
-  if (ironMatch) extraAnalysis.push(`Iron: ${ironMatch[1]} ppm (min) — see note in Vitamins & Minerals regarding iron's effect on copper and zinc absorption.`);
-  const zincMatch = text.match(/zinc[^0-9]*([0-9]+\.?[0-9]*)\s*ppm/i);
-  if (zincMatch) extraAnalysis.push(`Zinc: ${zincMatch[1]} ppm (min).`);
-  const copperMatch = text.match(/copper[^0-9]*([0-9]+\.?[0-9]*)\s*ppm/i);
-  if (copperMatch) extraAnalysis.push(`Copper: ${copperMatch[1]} ppm (min).`);
-  const vitCMatch = text.match(/vitamin\s*c[^0-9]*([0-9]+\.?[0-9]*)\s*mg/i);
-  if (vitCMatch) extraAnalysis.push(`Vitamin C: ${vitCMatch[1]} mg/lb (min) — horses synthesize their own vitamin C, but supplemental amounts may support horses under stress or immune challenge.`);
-  const biotinMatch = text.match(/biotin[^0-9]*([0-9]+\.?[0-9]*)\s*mg/i);
-  if (biotinMatch) extraAnalysis.push(`Biotin: ${biotinMatch[1]} mg/lb (min) — supports hoof integrity and coat quality.`);
+
+  // Amino acids
+  if (analysis.lysine)    extraAnalysis.push(`Lysine: <strong>${analysis.lysine.value}%</strong> (min) — an essential amino acid horses cannot synthesize. Listed individually in the guaranteed analysis, which is a quality indicator.`);
+
+  // Macrominerals
+  if (analysis.magnesium) extraAnalysis.push(`Magnesium: <strong>${analysis.magnesium.value}%</strong> (min) — important for muscle function, nerve signaling, and insulin sensitivity.`);
+  if (analysis.potassium) extraAnalysis.push(`Potassium: <strong>${analysis.potassium.value}%</strong> (min) — an electrolyte critical for sweating horses. Heavy work or hot climates increase potassium needs.`);
+
+  // Fiber fractions — ADF and NDF
+  if (analysis.adf) {
+    const adfVal = analysis.adf.value;
+    const adfNote = adfVal >= 10
+      ? `ADF: <strong>${adfVal}%</strong> (max) — acid detergent fiber, a measure of less-digestible fiber (cellulose + lignin). Values above 10% suggest meaningful forage fiber content, which supports hindgut health.`
+      : `ADF: <strong>${adfVal}%</strong> (max) — relatively low, indicating this feed is not primarily a forage-based or high-fiber product.`;
+    extraAnalysis.push(adfNote);
+  }
+  if (analysis.ndf) {
+    const ndfVal = analysis.ndf.value;
+    extraAnalysis.push(`NDF: <strong>${ndfVal}%</strong> (max) — neutral detergent fiber, the total fiber fraction including ADF plus hemicellulose. Higher NDF indicates more forage character. Values above 20% suggest the feed has meaningful hay-like fiber content.`);
+  }
+
+  // Trace minerals — pull from analysis patterns where available
+  if (analysis.manganese) extraAnalysis.push(`Manganese: <strong>${analysis.manganese.value} ppm</strong> (min) — supports bone development, cartilage, and enzyme function.`);
+  if (analysis.iron) {
+    const ironVal = analysis.iron.value;
+    const ironNote = ironVal >= 150
+      ? `Iron: <strong>${ironVal} ppm</strong> (min) — elevated. High iron interferes with copper and zinc absorption. Combined with potentially high iron in hay (common in many regions), total iron load may be a concern.`
+      : `Iron: <strong>${ironVal} ppm</strong> (min).`;
+    extraAnalysis.push(ironNote);
+  }
+  if (analysis.zinc)   extraAnalysis.push(`Zinc: <strong>${analysis.zinc.value} ppm</strong> (min).`);
+  if (analysis.copper) extraAnalysis.push(`Copper: <strong>${analysis.copper.value} ppm</strong> (min).`);
+
+  // Vitamin C — still direct regex (not in ANALYSIS_PATTERNS, rarely on labels)
+  const vitCMatch = text.match(/vitamin\s*c[^0-9\n]{0,30}([0-9]+\.?[0-9]*)\s*mg/i);
+  if (vitCMatch) extraAnalysis.push(`Vitamin C: <strong>${vitCMatch[1]} mg/lb</strong> (min) — horses synthesize their own vitamin C, but supplemental amounts may support horses under stress or immune challenge.`);
+
+  // Biotin
+  if (analysis.biotin) extraAnalysis.push(`Biotin: <strong>${analysis.biotin.value} mg/lb</strong> (min) — supports hoof wall integrity and coat quality. Research-supported for hoof horn synthesis.`);
 
   // ── Feeding directions block
   let feedingDirHTML = '';
