@@ -459,23 +459,35 @@ function analyzeIngredientOrder(text) {
     });
   }
 
-  // ── Flag: molasses/sugar in top 5
-  const top5Sugar = top5.filter(i => categorizeIngredient(i) === 'sugar');
-  if (top5Sugar.length) {
+  // ── Flag: molasses/sugar position — precise 4-tier system
+  const allSugar  = ingredients.filter(i => categorizeIngredient(i) === 'sugar');
+  const sugarPos  = allSugar.length ? ingredients.indexOf(allSugar[0]) + 1 : 0;
+  const sugarName = allSugar.length ? allSugar[0] : null;
+
+  if (sugarPos === 1 || sugarPos === 2) {
+    // Top 2 — sugar is a primary ingredient by weight
     flags.push({
       level: 'caution',
-      text: `<strong>Sugar ingredient in top 5.</strong> "${top5Sugar[0]}" appears near the top of the ingredient list — indicating a meaningful sugar contribution, not just a trace for palatability. Relevant for horses with metabolic conditions.`
+      text: `<strong>⚠ "${sugarName}" is ingredient #${sugarPos} — one of the largest components by weight.</strong> Sugar this high in the ingredient list is unusual and indicates a high-sugar formula. Not appropriate for horses with insulin resistance, laminitis, EMS, or PPID/Cushing's.`
     });
-  } else {
-    // Check if sugar appears at all but lower in list
-    const allSugar = ingredients.filter(i => categorizeIngredient(i) === 'sugar');
-    const sugarPos = allSugar.length ? ingredients.indexOf(allSugar[0]) + 1 : 0;
-    if (sugarPos > 5 && sugarPos > 0) {
-      flags.push({
-        level: 'note',
-        text: `<strong>Sugar ingredient present but lower in the list.</strong> "${allSugar[0]}" appears at position ${sugarPos} — likely a smaller amount used for palatability rather than a primary energy source.`
-      });
-    }
+  } else if (sugarPos >= 3 && sugarPos <= 5) {
+    // Positions 3–5 — meaningful contributor
+    flags.push({
+      level: 'caution',
+      text: `<strong>"${sugarName}" appears at position #${sugarPos}</strong> in the ingredient list — a meaningful sugar contributor, not just a trace amount. This feed has a notable sugar content from ${sugarName}. Relevant for horses with metabolic conditions, insulin resistance, or laminitis history.`
+    });
+  } else if (sugarPos >= 6 && sugarPos <= 9) {
+    // Positions 6–9 — moderate, likely palatability
+    flags.push({
+      level: 'note',
+      text: `<strong>"${sugarName}" appears at position #${sugarPos}</strong> — mid-list, suggesting a moderate amount likely used for palatability and dust control rather than as a primary energy source. Still relevant for sensitive horses — ask the manufacturer for the sugar % value.`
+    });
+  } else if (sugarPos >= 10) {
+    // Position 10+ — minor trace amount
+    flags.push({
+      level: 'info',
+      text: `<strong>"${sugarName}" appears at position #${sugarPos}</strong> — near the end of the ingredient list, indicating a small trace amount, likely for palatability only. Minimal sugar contribution expected at this position.`
+    });
   }
 
   // ── Flag: fiber sources leading (positive signal)
@@ -667,7 +679,24 @@ function decodeLabel(text) {
 
   // ── Sugar ingredient signals from ingredient list
   if (hasIngList && sugarFound.length) {
-    sugarWarnings.push(`Sugar/palatability ingredients detected: ${sugarFound.map(s => pill(s, true)).join(' ')}`);
+    // Build position-aware molasses note
+    const ingList       = parseIngredientOrder(text);
+    const sugarIngreds  = ingList.filter(i => categorizeIngredient(i) === 'sugar');
+    const sugarPosition = sugarIngreds.length ? ingList.indexOf(sugarIngreds[0]) + 1 : 0;
+    const sugarIngName  = sugarIngreds.length ? sugarIngreds[0] : sugarFound[0];
+
+    let posNote = '';
+    if (sugarPosition >= 1 && sugarPosition <= 2) {
+      posNote = `<strong style="color:#8B2E00"> — listed at position #${sugarPosition} (one of the largest ingredients by weight). High sugar contribution.</strong>`;
+    } else if (sugarPosition >= 3 && sugarPosition <= 5) {
+      posNote = `<strong style="color:#8B4A00"> — listed at position #${sugarPosition} (meaningful sugar contributor).</strong>`;
+    } else if (sugarPosition >= 6 && sugarPosition <= 9) {
+      posNote = ` — listed at position #${sugarPosition} (moderate amount, likely for palatability).`;
+    } else if (sugarPosition >= 10) {
+      posNote = ` — listed at position #${sugarPosition} (trace amount near end of list, minimal sugar contribution expected).`;
+    }
+
+    sugarWarnings.push(`Sugar/palatability ingredients detected: ${sugarFound.map(s => pill(s, true)).join(' ')}${posNote}`);
   }
 
   // ── NSC: listed directly
