@@ -1568,11 +1568,61 @@ function decodeLabel(text) {
     return html;
   })();
 
-  // ── Hoof / Skin / Coat
+  // ── Hoof / Skin / Coat — specific to what is actually detected
   const uniqueHoof = [...new Set(hoofFound)];
-  const hoofHTML = uniqueHoof.length
-    ? `Hoof, skin, and coat support detected: ${uniqueHoof.map(h => pill(h)).join(' ')}<br><br>Biotin, zinc, copper, and methionine all play roles in hoof wall integrity, skin condition, and coat quality. Results typically take 6–12 months to be visible in hoof growth.`
-    : 'No specific hoof/skin/coat support ingredients detected.';
+  const hoofHTML = (() => {
+    if (!uniqueHoof.length) {
+      return 'No specific hoof, skin, or coat support ingredients detected in this label.';
+    }
+
+    const ing = textLower(ingText || text);
+    const detected = uniqueHoof.map(h => pill(h)).join(' ');
+    const sections = [];
+
+    // Biotin — the most research-supported hoof ingredient
+    const hasBiotin = uniqueHoof.some(h => /biotin/.test(h.toLowerCase()));
+    if (hasBiotin) {
+      const biotinVal = analysis.biotin ? analysis.biotin.value : null;
+      const biotinNote = biotinVal
+        ? `<strong>Biotin:</strong> ${biotinVal} mg/lb detected. Biotin is the most research-supported ingredient for hoof wall quality. Studies suggest horses with poor hoof quality may benefit from 15–20 mg/day total — at this level${biotinVal * 4 >= 15 ? ', a typical 4-lb feeding provides approximately ' + Math.round(biotinVal * 4) + ' mg/day' : ', a 4-lb feeding provides approximately ' + Math.round(biotinVal * 4) + ' mg/day which may be below the research threshold of 15–20 mg/day'}. Results typically take 6–12 months to appear in new hoof growth.`
+        : '<strong>Biotin</strong> detected in the ingredient list — the most research-supported ingredient for hoof wall quality. Paste the guaranteed analysis for mg/lb value. Results typically take 6–12 months to appear in new hoof growth.';
+      sections.push(biotinNote);
+    }
+
+    // Omega-3s / flaxseed — coat and anti-inflammatory
+    const hasOmega = uniqueHoof.some(h => /flax|linseed|omega|fish oil/.test(h.toLowerCase()));
+    if (hasOmega) {
+      const omegaIngreds = uniqueHoof.filter(h => /flax|linseed|omega|fish oil/.test(h.toLowerCase()));
+      sections.push(`<strong>Omega-3 sources</strong> (${omegaIngreds.join(', ')}): support coat shine, skin health, and have anti-inflammatory properties. Flaxseed provides alpha-linolenic acid (ALA); fish oil provides EPA and DHA which are more directly usable. Effects on coat quality typically visible within 6–10 weeks.`);
+    }
+
+    // Methionine — sulfur amino acid for hoof and coat
+    const hasMethionine = uniqueHoof.some(h => /methionine/.test(h.toLowerCase()));
+    if (hasMethionine) {
+      sections.push('<strong>Methionine</strong> detected — a sulfur-containing amino acid important for hoof horn synthesis, coat quality, and connective tissue. Often added to feeds targeting hoof health alongside biotin.');
+    }
+
+    // Zinc/copper chelates — absorption-optimized forms
+    const hasChelate = uniqueHoof.some(h => /chelate|proteinate/.test(h.toLowerCase()));
+    if (hasChelate) {
+      const chelateIngreds = uniqueHoof.filter(h => /chelate|proteinate/.test(h.toLowerCase()));
+      sections.push(`<strong>Chelated minerals</strong> (${chelateIngreds.join(', ')}): amino acid chelated or proteinates forms are generally more bioavailable than inorganic sulfates. These forms are preferred for horses with absorption concerns or on high-iron diets that compete with mineral uptake.`);
+    }
+
+    // Overall strength assessment
+    const supportScore = (hasBiotin ? 2 : 0) + (hasOmega ? 2 : 0) + (hasMethionine ? 1 : 0) + (hasChelate ? 1 : 0);
+    let strengthNote = '';
+    if (supportScore >= 4) {
+      strengthNote = '<br><em style="font-size:0.82rem;color:#2D5C47">This feed has a strong hoof and coat support profile — biotin, omega-3s, and/or methionine are all present. Horses with active hoof or coat concerns may not need additional targeted supplementation, but verify with your vet.</em>';
+    } else if (supportScore >= 2) {
+      strengthNote = '<br><em style="font-size:0.82rem;color:#6B6B64">Moderate hoof and coat support detected. Horses with active hoof wall issues or coat problems may benefit from additional targeted supplementation.</em>';
+    } else {
+      strengthNote = '<br><em style="font-size:0.82rem;color:#6B6B64">Limited hoof and coat support ingredients detected. Horses with active hoof wall issues or coat problems may need a targeted supplement.</em>';
+    }
+
+    return `Hoof, skin, and coat support detected: ${detected}<br><br>` +
+      sections.join('<br><br>') + strengthNote;
+  })();
 
   // ── Guaranteed Analysis Notes — expanded
   const anNotes = [];
