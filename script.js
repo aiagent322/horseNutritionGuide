@@ -1379,10 +1379,76 @@ function decodeLabel(text) {
     vitHTML = 'No specific vitamin or mineral ingredients detected.';
   }
 
-  // ── Digestive Support
-  const digestHTML = digestFound.length
-    ? `Digestive support ingredients detected: ${digestFound.map(d => pill(d)).join(' ')}<br><br>These ingredients support hindgut microbial health and fiber fermentation. Their effectiveness in pelleted or extruded feeds can vary — if digestive health is a primary concern, discuss with your vet or nutritionist.`
-    : 'No digestive support ingredients (yeast culture, probiotics, prebiotics) detected.';
+  // ── Digestive Support — differentiated by type
+  const digestHTML = (() => {
+    if (!digestFound.length) {
+      return 'No digestive support ingredients (yeast culture, probiotics, prebiotics) detected in this label.';
+    }
+
+    const ing = textLower(ingText || text);
+
+    // Classify detected digestive ingredients by type
+    const probioticBacteria = [];
+    const yeastIngredients  = [];
+    const prebioticIngredients = [];
+
+    const bacteriaNames = ['lactobacillus','enterococcus','pediococcus','bifidobacterium','bacillus'];
+    const yeastNames    = ['saccharomyces','yeast culture','dried yeast','brewer'];
+    const prebioticNames= ['mannan','fructooligosaccharide','fos','mos','inulin','prebiotic'];
+
+    digestFound.forEach(d => {
+      const dl = d.toLowerCase();
+      if (bacteriaNames.some(b => dl.includes(b)))  probioticBacteria.push(d);
+      else if (yeastNames.some(y => dl.includes(y))) yeastIngredients.push(d);
+      else if (prebioticNames.some(p => dl.includes(p))) prebioticIngredients.push(d);
+      else yeastIngredients.push(d); // default to yeast category
+    });
+
+    // Check if this is a pelleted or extruded feed (affects probiotic viability)
+    const isPelleted = feedForm && (feedForm.primary === 'pelleted' || feedForm.primary === 'extruded');
+    const isExtruded = feedForm && feedForm.primary === 'extruded';
+
+    let html = `Digestive support ingredients detected: ${digestFound.map(d => pill(d)).join(' ')}<br><br>`;
+    const sections = [];
+
+    if (probioticBacteria.length) {
+      let bacteriaNote = `<strong>Live bacteria (probiotics):</strong> ${probioticBacteria.join(', ')}. `;
+      bacteriaNote += 'These are live microorganisms intended to support the hindgut bacterial population. ';
+      if (isExtruded) {
+        bacteriaNote += '<strong style="color:#8B4A00">⚠ Caution: Extrusion uses high heat and pressure which typically kills live bacteria. Ask the manufacturer whether probiotics are added post-extrusion to ensure viability.</strong>';
+      } else if (isPelleted) {
+        bacteriaNote += '<strong style="color:#8B4A00">⚠ Note: Pelleting heat can reduce live bacteria counts. Some manufacturers add probiotics after pelleting (post-pellet application) to preserve viability — ask the manufacturer.</strong>';
+      } else {
+        bacteriaNote += 'Efficacy depends on strain, CFU count, and storage conditions. Keep feed in a cool, dry place and use before expiration.';
+      }
+      sections.push(bacteriaNote);
+    }
+
+    if (yeastIngredients.length) {
+      let yeastNote = `<strong>Yeast / fermentation products:</strong> ${yeastIngredients.join(', ')}. `;
+      if (ing.includes('saccharomyces cerevisiae') || ing.includes('yeast culture')) {
+        yeastNote += 'Saccharomyces cerevisiae yeast culture is a well-researched digestive support ingredient. It acts as a prebiotic — supporting existing hindgut bacteria and fiber fermentation efficiency — rather than introducing live organisms. ';
+        yeastNote += 'Dried yeast culture (not live yeast) survives pelleting and extrusion better than live bacteria.';
+      } else {
+        yeastNote += 'Yeast-based ingredients support hindgut fermentation and fiber digestion. More heat-stable than live bacteria.';
+      }
+      sections.push(yeastNote);
+    }
+
+    if (prebioticIngredients.length) {
+      sections.push(`<strong>Prebiotics:</strong> ${prebioticIngredients.join(', ')}. Prebiotic compounds (such as mannan oligosaccharides or FOS) feed beneficial hindgut bacteria rather than introducing live organisms. They are not affected by feed processing heat.`);
+    }
+
+    html += sections.join('<br><br>');
+
+    // Count distinct strains/species if multiple bacteria found
+    const strainCount = probioticBacteria.length;
+    if (strainCount >= 3) {
+      html += `<br><br><em style="font-size:0.82rem;color:#6B6B64">This feed contains ${strainCount} distinct bacterial strains — a multi-strain probiotic approach. Research on multi-strain vs single-strain efficacy in horses is limited; discuss with your vet if gut health is a primary concern.</em>`;
+    }
+
+    return html;
+  })();
 
   // ── Hoof / Skin / Coat
   const uniqueHoof = [...new Set(hoofFound)];
