@@ -560,6 +560,38 @@ function detectRedFlags(text, ingText, analysis) {
     }
   }
 
+  // ── 9. PSSM / tying-up / RER — grain-forward feed flag
+  // Horses with PSSM1, PSSM2, RER, or recurrent tying-up
+  // need very low starch AND low sugar — grain-forward feeds are problematic
+  const grainIngredients = ingText ? [
+    'corn','maize','oats','barley','wheat','milo','sorghum','grain'
+  ].filter(g => textLower(ingText).includes(g)) : [];
+
+  const nscForPSSM  = analysis.nsc    ? analysis.nsc.value    : null;
+  const calcNSCPSSM = (analysis.sugar && analysis.starch) ? (analysis.sugar.value + analysis.starch.value) : null;
+  const effectiveNSCPSSM = nscForPSSM || calcNSCPSSM;
+
+  // Flag if: 2+ grain ingredients in top 5, OR NSC/calculated NSC > 15%
+  const top5Ingredients = (ingText ? ingText.split(',').slice(0,5).join(',') : '');
+  const grainInTop5 = grainIngredients.filter(g => textLower(top5Ingredients).includes(g));
+
+  if (grainInTop5.length >= 2 || (effectiveNSCPSSM !== null && effectiveNSCPSSM > 15)) {
+    flags.push({
+      level: 'critical',
+      title: 'Not Appropriate for PSSM / Tying-Up / RER',
+      detail: `This feed appears to be grain-forward${grainInTop5.length ? ` (${grainInTop5.slice(0,3).join(', ')} detected near the top of the ingredient list)` : ''}${effectiveNSCPSSM ? ` with an NSC of approximately ${effectiveNSCPSSM}%` : ''}. Horses with Polysaccharide Storage Myopathy (PSSM type 1 or 2), Recurrent Exertional Rhabdomyolysis (RER), or recurring tying-up require a diet with very low starch and sugar — typically below 10–12% NSC total. High-grain feeds can trigger acute episodes. If your horse has any history of muscle stiffness, reluctance to move, or "tying-up," do not feed this without explicit veterinary approval and a confirmed diagnosis.`
+    });
+  }
+
+  // ── 10. EMS/IR horse — high NSC flag independent of molasses
+  if (effectiveNSCPSSM !== null && effectiveNSCPSSM > 20 && !flags.some(f => f.title.includes('Molasses'))) {
+    flags.push({
+      level: 'critical',
+      title: 'High NSC — Not for Metabolic Horses',
+      detail: `NSC appears to be approximately ${effectiveNSCPSSM}%. This exceeds the commonly recommended threshold of 10–12% NSC for horses with insulin resistance (IR), Equine Metabolic Syndrome (EMS), or laminitis history. Do not feed to metabolic horses without veterinary guidance.`
+    });
+  }
+
   return flags;
 }
 
