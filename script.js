@@ -829,21 +829,48 @@ function extractIngredientText(text) {
 
 // Parse ingredient list into ordered array
 function parseIngredientOrder(text) {
-  // Extract just the ingredient section
   let ingSection = '';
+
+  // Try to find INGREDIENTS: header and take only what follows it
   const headerMatch = text.match(/ingredients\s*:([\s\S]*?)(?=guaranteed\s*analysis|feeding\s*directions|important:|$)/i);
   if (headerMatch) {
     ingSection = headerMatch[1];
   } else {
+    // No header — use the stripped ingredient text
     ingSection = extractIngredientText(text);
+    // Additional safety: strip lines that look like product names or headers
+    // (all-caps lines, lines with no comma, lines shorter than 5 chars)
+    ingSection = ingSection
+      .split('\n')
+      .filter(line => {
+        const t = line.trim();
+        if (!t) return false;
+        if (t.length < 4) return false;
+        // Skip lines that are all uppercase (product name / section header)
+        if (t === t.toUpperCase() && /[A-Z]/.test(t)) return false;
+        // Skip lines with numbers followed by % (analysis rows that slipped through)
+        if (/\d+\.?\d*\s*%/.test(t)) return false;
+        return true;
+      })
+      .join(' ');
   }
 
-  // Split on commas and clean up each entry
+  // Split on commas, clean each entry, filter out non-ingredient noise
   return ingSection
     .replace(/\n/g, ' ')
+    .replace(/\s+/g, ' ')
     .split(',')
     .map(s => s.trim().toLowerCase())
-    .filter(s => s.length > 2);
+    .filter(s => {
+      if (s.length < 3) return false;
+      // Skip entries that look like product names, headers, or numbers
+      if (/^\d/.test(s)) return false;                        // starts with number
+      if (/guaranteed|analysis|feeding|direction|important/i.test(s)) return false;
+      if (/crude|minimum|maximum|\bmin\b|\bmax\b/i.test(s)) return false;
+      // Skip entries that are suspiciously long (probably grabbed a sentence)
+      if (s.split(' ').length > 8) return false;
+      return true;
+    });
 }
 
 // Categorize a single ingredient string
@@ -1298,11 +1325,27 @@ function decodeLabel(text) {
       }
 
       // ── IU level context
-      const vitEContext = vitEVal >= 500
-        ? `Vitamin E listed at <strong>${vitEVal} IU/lb</strong> — a generous level. At typical feeding rates this likely meets or exceeds maintenance needs for most horses without pasture access.`
-        : vitEVal >= 200
-        ? `Vitamin E listed at <strong>${vitEVal} IU/lb</strong> — a reasonable level. Horses without pasture access typically need 1–2 IU per pound of body weight daily from all sources. Verify total intake based on your feeding rate.`
-        : `Vitamin E listed at <strong>${vitEVal} IU/lb</strong> — relatively low. Horses without regular pasture access may need supplemental Vitamin E beyond what this feed provides, especially horses with muscle conditions or neurological concerns.`;
+      // ── If feeding rate is known, calculate actual daily IU delivery
+      let vitEContext = '';
+      if (feedingDir && feedingDir.midLbs && feedingDir.refWeightLbs) {
+        const iuPerDay    = Math.round(feedingDir.midLbs * vitEVal);
+        const refWeight   = feedingDir.refWeightLbs;
+        const needLow     = Math.round(refWeight * 1.0);  // 1 IU/lb body weight minimum
+        const needHigh    = Math.round(refWeight * 2.0);  // 2 IU/lb body weight adequate
+        const iuSuffix    = iuPerDay >= needHigh
+          ? `<strong style="color:#1C3A2F">✓ likely meets maintenance needs</strong> for a ${refWeight}-lb horse`
+          : iuPerDay >= needLow
+          ? `may be adequate for a ${refWeight}-lb horse at maintenance — verify with total diet`
+          : `<strong style="color:#8B4A00">may fall short</strong> for a ${refWeight}-lb horse (needs ~${needLow}–${needHigh} IU/day from all sources)`;
+        vitEContext = `Vitamin E listed at <strong>${vitEVal} IU/lb</strong>. At the detected feeding rate (~${feedingDir.rate}), this provides approximately <strong>${iuPerDay} IU/day</strong> — ${iuSuffix}.`;
+      } else {
+        // No feeding rate — use IU/lb tiers with guidance
+        vitEContext = vitEVal >= 500
+          ? `Vitamin E listed at <strong>${vitEVal} IU/lb</strong> — a high level. At typical feeding rates (4–6 lbs/day) this likely meets or exceeds maintenance needs for most horses without pasture access.`
+          : vitEVal >= 200
+          ? `Vitamin E listed at <strong>${vitEVal} IU/lb</strong> — a moderate level. At 4 lbs/day this provides ~${Math.round(4 * vitEVal)} IU; at 6 lbs/day ~${Math.round(6 * vitEVal)} IU. A 1,000-lb horse at maintenance typically needs 1,000–2,000 IU/day from all sources. Paste the feeding directions for a more precise calculation.`
+          : `Vitamin E listed at <strong>${vitEVal} IU/lb</strong> — relatively low. Even at 6 lbs/day this provides only ~${Math.round(6 * vitEVal)} IU. Horses without regular pasture access, or those with muscle or neurological conditions, may need additional Vitamin E supplementation.`;
+      }
 
       notes.push(vitEContext + vitEFormNote);
     }
