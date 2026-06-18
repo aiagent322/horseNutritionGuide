@@ -388,6 +388,170 @@ function extractIngredientText(text) {
   return lines.join('\n');
 }
 
+
+// ─────────────────────────────────────────────
+// INGREDIENT ORDER ANALYSIS
+// Parses the ingredient list into an ordered
+// array and evaluates position-based signals.
+// Feed labels list by weight — position matters.
+// ─────────────────────────────────────────────
+
+// Parse ingredient list into ordered array
+function parseIngredientOrder(text) {
+  // Extract just the ingredient section
+  let ingSection = '';
+  const headerMatch = text.match(/ingredients\s*:([\s\S]*?)(?=guaranteed\s*analysis|feeding\s*directions|important:|$)/i);
+  if (headerMatch) {
+    ingSection = headerMatch[1];
+  } else {
+    ingSection = extractIngredientText(text);
+  }
+
+  // Split on commas and clean up each entry
+  return ingSection
+    .replace(/\n/g, ' ')
+    .split(',')
+    .map(s => s.trim().toLowerCase())
+    .filter(s => s.length > 2);
+}
+
+// Categorize a single ingredient string
+function categorizeIngredient(ing) {
+  const i = ing.toLowerCase();
+  if (/molasses|cane molasses|corn syrup|dextrose|sucrose/.test(i))         return 'sugar';
+  if (/corn|maize|wheat|barley|oat|grain|milo|sorghum|rye/.test(i) &&
+      !/oat hull|oat fiber/.test(i))                                          return 'starch';
+  if (/beet pulp|soybean hull|alfalfa|hay|oat hull|oat fiber/.test(i))      return 'fiber';
+  if (/soybean meal|canola meal|linseed meal|cottonseed meal/.test(i))       return 'protein';
+  if (/oil|fat|rice bran|flaxseed|linseed/.test(i))                         return 'fat';
+  if (/salt|sodium chloride/.test(i))                                         return 'salt';
+  if (/limestone|calcium carbonate|dicalcium|monocalcium|phosphate/.test(i)) return 'mineral';
+  if (/vitamin|supplement|niacin|biotin|riboflavin|thiamine|choline|folic|pyridoxine|pantothenate/.test(i)) return 'vitamin';
+  if (/lactobacillus|enterococcus|pediococcus|saccharomyces|yeast|fermentation/.test(i)) return 'probiotic';
+  if (/zinc|copper|manganese|selenium|iron|cobalt|iodine|magnesium/.test(i)) return 'trace-mineral';
+  if (/lysine|methionine|threonine|amino acid/.test(i))                       return 'amino-acid';
+  if (/flavor/.test(i))                                                        return 'flavoring';
+  return 'other';
+}
+
+// Main ingredient order analysis — returns flags array
+function analyzeIngredientOrder(text) {
+  if (!hasIngredientList(text)) return [];
+
+  const ingredients = parseIngredientOrder(text);
+  if (!ingredients.length) return [];
+
+  const flags = [];
+  const top3  = ingredients.slice(0, 3);
+  const top5  = ingredients.slice(0, 5);
+
+  // ── Flag: starch/grain in top 3
+  const top3Starch = top3.filter(i => categorizeIngredient(i) === 'starch');
+  if (top3Starch.length >= 2) {
+    flags.push({
+      level: 'caution',
+      text: `<strong>High-starch ingredients lead the list.</strong> "${top3Starch.join('", "')}" appear among the first three ingredients — meaning they make up the largest portion of this feed by weight. This is a grain-forward formula. Horses with insulin resistance, laminitis, EMS, or PPID/Cushing's should not be on high-starch feeds without veterinary guidance.`
+    });
+  } else if (top3Starch.length === 1) {
+    flags.push({
+      level: 'note',
+      text: `<strong>Grain ingredient near the top.</strong> "${top3Starch[0]}" appears in the first three ingredients, indicating it's one of the larger components of this feed by weight.`
+    });
+  }
+
+  // ── Flag: molasses/sugar in top 5
+  const top5Sugar = top5.filter(i => categorizeIngredient(i) === 'sugar');
+  if (top5Sugar.length) {
+    flags.push({
+      level: 'caution',
+      text: `<strong>Sugar ingredient in top 5.</strong> "${top5Sugar[0]}" appears near the top of the ingredient list — indicating a meaningful sugar contribution, not just a trace for palatability. Relevant for horses with metabolic conditions.`
+    });
+  } else {
+    // Check if sugar appears at all but lower in list
+    const allSugar = ingredients.filter(i => categorizeIngredient(i) === 'sugar');
+    const sugarPos = allSugar.length ? ingredients.indexOf(allSugar[0]) + 1 : 0;
+    if (sugarPos > 5 && sugarPos > 0) {
+      flags.push({
+        level: 'note',
+        text: `<strong>Sugar ingredient present but lower in the list.</strong> "${allSugar[0]}" appears at position ${sugarPos} — likely a smaller amount used for palatability rather than a primary energy source.`
+      });
+    }
+  }
+
+  // ── Flag: fiber sources leading (positive signal)
+  const top3Fiber = top3.filter(i => categorizeIngredient(i) === 'fiber');
+  if (top3Fiber.length >= 2) {
+    flags.push({
+      level: 'positive',
+      text: `<strong>Fiber sources lead the ingredient list.</strong> "${top3Fiber.join('", "')}" appear among the first three ingredients — a positive signal. This feed appears to derive most of its energy from digestible fiber rather than grain starch, which is easier on the hindgut and more appropriate for metabolic horses.`
+    });
+  }
+
+  // ── Flag: first ingredient
+  if (ingredients[0]) {
+    const cat = categorizeIngredient(ingredients[0]);
+    const firstIng = ingredients[0];
+    if (cat === 'starch') {
+      flags.push({
+        level: 'caution',
+        text: `<strong>"${firstIng}" is the first ingredient</strong> — meaning it's present in the largest amount by weight. This is a starch/grain-primary feed.`
+      });
+    } else if (cat === 'fiber') {
+      flags.push({
+        level: 'positive',
+        text: `<strong>"${firstIng}" is the first ingredient</strong> — the largest component by weight is a fiber source, which is a favorable characteristic for hindgut health.`
+      });
+    } else if (cat === 'sugar') {
+      flags.push({
+        level: 'caution',
+        text: `<strong>"${firstIng}" is the first ingredient</strong> — sugar is the largest component by weight. This is unusual and worth questioning.`
+      });
+    }
+  }
+
+  // ── Flag: protein source position
+  const proteinIng = ingredients.findIndex(i => categorizeIngredient(i) === 'protein');
+  if (proteinIng >= 0 && proteinIng <= 2) {
+    flags.push({
+      level: 'note',
+      text: `<strong>Protein source "${ingredients[proteinIng]}" is near the top</strong> (position ${proteinIng + 1}) — indicating meaningful protein contribution from this ingredient.`
+    });
+  }
+
+  // ── Summary: total ingredient count
+  if (ingredients.length >= 5) {
+    const cats = ingredients.map(categorizeIngredient);
+    const starchCount  = cats.filter(c => c === 'starch').length;
+    const fiberCount   = cats.filter(c => c === 'fiber').length;
+    const vitCount     = cats.filter(c => c === 'vitamin' || c === 'trace-mineral' || c === 'amino-acid').length;
+    flags.push({
+      level: 'info',
+      text: `<strong>Label contains approximately ${ingredients.length} ingredients.</strong> Breakdown by category: ${fiberCount} fiber source${fiberCount !== 1 ? 's' : ''}, ${starchCount} grain/starch source${starchCount !== 1 ? 's' : ''}, ${vitCount} vitamin/mineral/amino acid addition${vitCount !== 1 ? 's' : ''}.`
+    });
+  }
+
+  return flags;
+}
+
+// Render ingredient order flags as HTML
+function renderIngredientOrderHTML(flags) {
+  if (!flags.length) return '';
+
+  const colorMap = {
+    caution:  { bg: '#FDF3EE', border: 'rgba(139,46,0,0.25)', icon: '⚠', color: '#8B2E00' },
+    note:     { bg: '#F8F4EE', border: 'rgba(200,182,154,0.4)', icon: '◆', color: '#5C3A1A' },
+    positive: { bg: '#E8F2ED', border: 'rgba(61,122,94,0.3)', icon: '✓', color: '#1C3A2F' },
+    info:     { bg: '#F8F4EE', border: 'rgba(200,182,154,0.3)', icon: '●', color: '#6B6B64' }
+  };
+
+  return flags.map(f => {
+    const s = colorMap[f.level] || colorMap.info;
+    return `<div style="background:${s.bg};border:1px solid ${s.border};border-radius:6px;padding:10px 13px;margin-bottom:8px;font-size:0.85rem;color:${s.color};">
+      <span style="margin-right:6px">${s.icon}</span>${f.text}
+    </div>`;
+  }).join('');
+}
+
 // ─────────────────────────────────────────────
 // MAIN DECODE FUNCTION
 // ─────────────────────────────────────────────
@@ -412,8 +576,10 @@ function decodeLabel(text) {
   const hoofFound    = hasIngList ? detectSignals(ingText, 'hoofCoat') :
                        detectSignals(text, 'hoofCoat'); // biotin/zinc/copper show in analysis too
 
-  const feedTypes = classifyFeedType(text);
-  const analysis  = extractAnalysis(text);
+  const feedTypes          = classifyFeedType(text);
+  const analysis           = extractAnalysis(text);
+  const ingredientOrderFlags = hasIngList ? analyzeIngredientOrder(text) : [];
+  const ingredientOrderHTML  = renderIngredientOrderHTML(ingredientOrderFlags);
 
   // ── No-ingredient-list warning banner
   const noIngBanner = !hasIngList
@@ -436,9 +602,13 @@ function decodeLabel(text) {
   if (grainFound.length) energyParts.push(`<strong>Grain/starch energy:</strong> ${grainFound.map(f => pill(f)).join(' ')}`);
   if (fatFound.length)   energyParts.push(`<strong>Fat energy:</strong> ${fatFound.map(f => pill(f)).join(' ')}`);
 
-  const energyHTML = !hasIngList ? noIngMsg
+  const energyBase = !hasIngList ? noIngMsg
     : energyParts.length ? energyParts.join('<br>')
     : 'No clear energy source ingredients detected. Check that the ingredient list was included.';
+
+  const energyHTML = energyBase + (hasIngList && ingredientOrderHTML
+    ? '<br><br><strong style="font-size:0.8rem;text-transform:uppercase;letter-spacing:0.07em;color:var(--text-light)">Ingredient Order Analysis</strong><br>' + ingredientOrderHTML
+    : '');
 
   // ── Protein
   const proteinHTML = !hasIngList
