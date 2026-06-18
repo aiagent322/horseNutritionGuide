@@ -2723,7 +2723,7 @@ document.addEventListener('DOMContentLoaded', function () {
   let rationFeeds = [{ name: '', labelText: '', lbsPerDay: 0 }];
 
   // ── DOM refs
-  let dropdown, loadBtn, statusMsg, rationWrap, rationSlots, rationAddBtn,
+  let dropdown, loadBtn, statusMsg, rationWrap, rationSlots, rationSlotsEl, rationAddBtn,
       rationAnalyzeBtn, rationOutput, feedInput, decodeBtn,
       shareBlock, shareLinkBtn, shareCardBtn, shareLinkMsg, shareCard,
       shareCardTitle, shareCardBody, profileSaveOpt, profileSaveCheck;
@@ -2733,7 +2733,8 @@ document.addEventListener('DOMContentLoaded', function () {
     loadBtn          = document.getElementById('libraryLoadBtn');
     statusMsg        = document.getElementById('libraryStatusMsg');
     rationWrap       = document.getElementById('rationBuilderWrap');
-    rationSlotsEl    = document.getElementById('rationSlots');
+    rationSlots    = document.getElementById('rationSlots');
+    rationSlotsEl  = rationSlots;
     rationAddBtn     = document.getElementById('rationAddBtn');
     rationAnalyzeBtn = document.getElementById('rationAnalyzeBtn');
     rationOutput     = document.getElementById('rationOutput');
