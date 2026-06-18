@@ -568,7 +568,7 @@ function detectRedFlags(text, ingText, analysis) {
     flags.push({
       level: 'critical',
       title: 'Molasses + High NSC',
-      detail: `Molasses is present in the ingredient list and NSC appears to be approximately ${effectiveNSC}%. This combination is not appropriate for horses with insulin resistance, EMS, PPID/Cushing's, or laminitis history. Do not feed this to metabolic horses without explicit veterinary approval.`
+      detail: `Molasses is present in the ingredient list and NSC appears to be approximately ${effectiveNSC}%. Metabolic horses — those with insulin resistance, EMS, PPID/Cushing's, or laminitis history — typically need diets below 10–12% NSC. This label shows both molasses and elevated NSC, which is a concern for those horses.`
     });
   }
 
@@ -649,7 +649,7 @@ function detectRedFlags(text, ingText, analysis) {
     flags.push({
       level: 'critical',
       title: 'Not Appropriate for PSSM / Tying-Up / RER',
-      detail: `This feed appears to be grain-forward${grainInTop5.length ? ` (${grainInTop5.slice(0,3).join(', ')} detected near the top of the ingredient list)` : ''}${effectiveNSCPSSM ? ` with an NSC of approximately ${effectiveNSCPSSM}%` : ''}. Horses with Polysaccharide Storage Myopathy (PSSM type 1 or 2), Recurrent Exertional Rhabdomyolysis (RER), or recurring tying-up require a diet with very low starch and sugar — typically below 10–12% NSC total. High-grain feeds can trigger acute episodes. If your horse has any history of muscle stiffness, reluctance to move, or "tying-up," do not feed this without explicit veterinary approval and a confirmed diagnosis.`
+      detail: `This feed appears to be grain-forward${grainInTop5.length ? ` (${grainInTop5.slice(0,3).join(', ')} detected near the top of the ingredient list)` : ''}${effectiveNSCPSSM ? ` with an NSC of approximately ${effectiveNSCPSSM}%` : ''}. Horses with Polysaccharide Storage Myopathy (PSSM type 1 or 2), Recurrent Exertional Rhabdomyolysis (RER), or recurring tying-up require a diet with very low starch and sugar — typically below 10–12% NSC total. High-grain feeds can trigger acute episodes. If your horse has any history of muscle stiffness, reluctance to move, or "tying-up," horses with muscle conditions like PSSM or RER typically need diets well below 10–12% NSC — this grain-forward profile is a concern for those horses.`
     });
   }
 
@@ -658,7 +658,7 @@ function detectRedFlags(text, ingText, analysis) {
     flags.push({
       level: 'critical',
       title: 'High NSC — Not for Metabolic Horses',
-      detail: `NSC appears to be approximately ${effectiveNSCPSSM}%. This exceeds the commonly recommended threshold of 10–12% NSC for horses with insulin resistance (IR), Equine Metabolic Syndrome (EMS), or laminitis history. Do not feed to metabolic horses without veterinary guidance.`
+      detail: `NSC appears to be approximately ${effectiveNSCPSSM}%. This exceeds the commonly recommended threshold of 10–12% NSC for horses with insulin resistance (IR), Equine Metabolic Syndrome (EMS), or laminitis history. Metabolic horses typically need diets below 10–12% NSC — this is a concern for those horses.`
     });
   }
 
@@ -1113,7 +1113,7 @@ function analyzeIngredientOrder(text) {
   if (top3Starch.length >= 2) {
     flags.push({
       level: 'caution',
-      text: `<strong>High-starch ingredients lead the list.</strong> "${top3Starch.join('", "')}" appear among the first three ingredients — meaning they make up the largest portion of this feed by weight. This is a grain-forward formula. Horses with insulin resistance, laminitis, EMS, or PPID/Cushing's should not be on high-starch feeds without veterinary guidance.`
+      text: `<strong>High-starch ingredients lead the list.</strong> "${top3Starch.join('", "')}" appear among the first three ingredients — meaning they make up the largest portion of this feed by weight. This is a grain-forward formula. Metabolic horses — those with insulin resistance, laminitis, EMS, or PPID/Cushing's — typically need low-starch diets. This grain-forward profile is a concern for those horses.`
     });
   } else if (top3Starch.length === 1) {
     flags.push({
@@ -1361,7 +1361,7 @@ function buildIntroSummary(text, analysis, feedTypes, feedForm, fiberFound, grai
     } else if (nscVal <= 15) {
       nscSent += ` This is moderate. Use caution with insulin-sensitive horses and verify this fits within their total daily NSC budget.`;
     } else {
-      nscSent += ` This is elevated. This feed is not appropriate for horses with insulin resistance, EMS, laminitis history, Cushing's disease, or PSSM without explicit veterinary guidance.`;
+      nscSent += ` This is elevated. Metabolic horses typically need diets below 10–12% NSC. This feed's NSC is a concern for horses with insulin resistance, EMS, laminitis history, Cushing's, or PSSM.`;
     }
     sentences.push(nscSent);
   } else if (hasMolasses && (grainLead || mixedEnergy)) {
@@ -1532,7 +1532,7 @@ function decodeLabel(text) {
       ? { label: 'Moderate-Low', color: '#5C3A1A', bg: '#FBF0DC', note: 'May be appropriate for horses in light to moderate work without metabolic concerns. Use caution with insulin-resistant or laminitis-risk horses.' }
       : val <= 20
       ? { label: 'Moderate', color: '#8B4A00', bg: '#FDF3EE', note: 'Not recommended for horses with insulin resistance, EMS, PPID/Cushing\'s, or laminitis history without veterinary guidance.' }
-      : { label: 'High', color: '#8B2E00', bg: '#FDF0EE', note: 'This level of NSC is not appropriate for horses with metabolic conditions. Consult your vet before feeding.' };
+      : { label: 'High', color: '#8B2E00', bg: '#FDF0EE', note: 'High NSC is a concern for horses with metabolic conditions. Review total daily NSC from all sources.' };
     return `<div style="background:${risk.bg};border-radius:6px;padding:10px 13px;margin:6px 0;font-size:0.88rem;">
       <strong style="color:${risk.color}">NSC ${source}: ~${val}% — ${risk.label}</strong><br>
       <span style="color:#5C3A1A">${risk.note}</span>
@@ -2187,7 +2187,7 @@ function decodeLabel(text) {
       const ingList = parseIngredientOrder(text);
       const molassesIdx = ingList.findIndex(i => /molasses|cane molasses/.test(i));
       if (molassesIdx >= 0 && molassesIdx <= 4) {
-        sentences.push(`<strong>Molasses appears at position #${molassesIdx + 1}</strong> in the ingredient list — a meaningful sugar contributor. Horses with metabolic conditions should not be fed this without veterinary guidance.`);
+        sentences.push(`<strong>Molasses appears at position #${molassesIdx + 1}</strong> in the ingredient list — a meaningful sugar contributor. Horses with metabolic conditions typically need low-sugar diets — molasses is a concern for those horses.`);
       } else if (molassesIdx >= 5) {
         sentences.push(`Molasses is present but at position #${molassesIdx + 1} — likely a small amount for palatability.`);
       }
@@ -2197,7 +2197,7 @@ function decodeLabel(text) {
       const effectiveNSC = nscVal || calcNSCVal;
       if (effectiveNSC !== null) {
         const nscSrc = nscVal ? 'listed' : 'calculated from sugar + starch';
-        const nscDesc = effectiveNSC <= 10 ? 'low — potentially suitable for metabolic horses (always verify with your vet)' : effectiveNSC <= 15 ? 'moderate — use caution with insulin-sensitive horses' : "elevated — not appropriate for horses with insulin resistance, EMS, laminitis, or PPID/Cushing's without veterinary guidance";
+        const nscDesc = effectiveNSC <= 10 ? 'low — below the commonly referenced 10–12% threshold for metabolic horses' : effectiveNSC <= 15 ? 'moderate — use caution with insulin-sensitive horses' : "elevated — a concern for horses with insulin resistance, EMS, laminitis, or PPID/Cushing's who typically need diets below 10–12% NSC";
         sentences.push(`NSC is <strong>~${effectiveNSC}%</strong> (${nscSrc}) — ${nscDesc}.`);
       } else if (grainFound.length >= 2 || molassesIdx >= 0 && molassesIdx <= 4) {
         sentences.push('NSC was not listed or calculable from this label. Given the ingredient profile, ask the manufacturer for tested NSC, sugar, and starch values before feeding to metabolic horses.');
@@ -2675,18 +2675,18 @@ document.addEventListener('DOMContentLoaded', function () {
     if (hasIR) {
       if (effectiveNSC !== null) {
         if (effectiveNSC > 12) {
-          flags.push({ type: 'caution', text: `NSC is approximately ${effectiveNSC}% — above the recommended 10–12% threshold for insulin-resistant and laminitis-risk horses. <strong>This feed is likely not appropriate for your horse without veterinary approval.</strong>` });
+          flags.push({ type: 'caution', text: `NSC is approximately ${effectiveNSC}% — above the recommended 10–12% threshold for insulin-resistant and laminitis-risk horses. Metabolic horses typically need diets below 10–12% NSC — this is a concern worth discussing with your vet or nutritionist.` });
         } else if (effectiveNSC <= 10) {
           flags.push({ type: 'ok', text: `NSC appears to be ${effectiveNSC}% — within the commonly recommended range for metabolic horses. Still verify with your vet and confirm the tested (not calculated) NSC value before feeding.` });
         } else {
           flags.push({ type: 'warn', text: `NSC appears to be ${effectiveNSC}% — borderline for a horse with insulin resistance or laminitis history. Discuss with your vet before feeding.` });
         }
       } else if (hasGrainLead) {
-        flags.push({ type: 'caution', text: `Grain ingredients appear near the top of the ingredient list, and NSC is not listed. For a horse with insulin resistance, Cushing\'s, or laminitis history, <strong>do not feed this without getting the NSC value from the manufacturer first.</strong>` });
+        flags.push({ type: 'caution', text: `Grain ingredients appear near the top of the ingredient list, and NSC is not listed. For a horse with insulin resistance, Cushing\'s, or laminitis history, get the tested NSC, sugar, and starch values from the manufacturer before feeding to a metabolic horse.` });
       } else if (hasFiberLead) {
         flags.push({ type: 'warn', text: `Fiber ingredients lead the list, which is a positive sign for a metabolic horse — but NSC is not listed. Ask the manufacturer for the tested NSC, sugar, and starch values before feeding.` });
       } else {
-        flags.push({ type: 'caution', text: `Your horse has metabolic concerns but NSC, sugar, and starch values are not on this label. <strong>Do not feed without getting these numbers from the manufacturer.</strong>` });
+        flags.push({ type: 'caution', text: `Your horse has metabolic concerns but NSC, sugar, and starch values are not on this label. ask the manufacturer for tested NSC, sugar, and starch values before feeding to a metabolic horse.` });
       }
       if (hasMolasses) {
         flags.push({ type: 'caution', text: `Molasses is present in the ingredient list — an added sugar that is generally not recommended for horses with insulin resistance, EMS, Cushing\'s, or laminitis history.` });
@@ -2696,7 +2696,7 @@ document.addEventListener('DOMContentLoaded', function () {
     // ── PSSM / TYING-UP
     if (hasPSSM) {
       if (hasGrainLead) {
-        flags.push({ type: 'caution', text: `Horses with PSSM or recurring tying-up require very low starch and sugar. Grain ingredients appear near the top of this label. <strong>This feed is likely not appropriate for your horse</strong> — discuss with your vet before feeding.` });
+        flags.push({ type: 'caution', text: `Horses with PSSM or recurring tying-up require very low starch and sugar. Grain ingredients appear near the top of this label. this grain-forward profile is a concern for horses with PSSM or tying-up history, who typically need very low-starch diets.` });
       } else if (effectiveNSC !== null && effectiveNSC > 10) {
         flags.push({ type: 'caution', text: `PSSM and tying-up horses typically need NSC below 10%. This feed appears to be approximately ${effectiveNSC}% NSC. Discuss with your vet or equine nutritionist.` });
       } else if (hasFiberLead && (effectiveNSC === null || effectiveNSC <= 10)) {
@@ -2747,7 +2747,7 @@ document.addEventListener('DOMContentLoaded', function () {
     // ── EASY KEEPER / OVERWEIGHT
     if (isEasyKeeper) {
       if (effectiveNSC !== null && effectiveNSC > 15) {
-        flags.push({ type: 'caution', text: `Your horse is an easy keeper and this feed appears to be ${effectiveNSC}% NSC. High-calorie feeds are generally not appropriate for overweight horses — consider a ration balancer paired with quality hay instead.` });
+        flags.push({ type: 'caution', text: `Your horse is an easy keeper and this feed appears to be ${effectiveNSC}% NSC. Easy keepers do well with controlled intake — a ration balancer paired with quality hay is a common approach for overweight horses.` });
       } else if (hasFiberLead) {
         flags.push({ type: 'ok', text: `Fiber-based energy is more appropriate for an easy keeper than grain starch. However, even fiber-based feeds add calories — monitor body condition and adjust feeding rate accordingly.` });
       }
