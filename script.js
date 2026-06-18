@@ -2271,74 +2271,88 @@ document.addEventListener('DOMContentLoaded', function () {
     if (!selectedFile || isScanning) return;
     isScanning = true;
 
-    if (ocrScanBtn) { ocrScanBtn.disabled = true; ocrScanBtn.textContent = 'Reading\u2026'; }
+    if (ocrScanBtn) { ocrScanBtn.disabled = true; ocrScanBtn.textContent = 'Reading…'; }
     hide(ocrResultMsg);
     hide(ocrErrorMsg);
-
-    if (typeof Tesseract === 'undefined') {
-      showError('Could not load the OCR engine. Check your internet connection and reload the page.');
-      return;
-    }
-
     show(ocrStatus);
     hide(ocrProgressWrap);
-    setStatus('Reading your label\u2026');
-    setProgress(0);
+    setStatus('Reading your label… this takes about 10 seconds.');
 
     try {
-      const result = await Tesseract.recognize(
-        selectedFile,
-        'eng',
-        {
-          logger: function (m) {
-            if (m.status === 'loading tesseract core' || m.status === 'initializing tesseract') {
-              setStatus('Starting up\u2026');
-            } else if (m.status === 'loading language traineddata') {
-              setStatus('Loading language data\u2026');
-              show(ocrProgressWrap);
-              setProgress(m.progress || 0);
-            } else if (m.status === 'recognizing text') {
-              setStatus('Reading your label\u2026 almost there.');
-              show(ocrProgressWrap);
-              setProgress(m.progress || 0);
-            }
-          }
-        }
-      );
+      // Convert image to base64
+      const base64 = await new Promise((resolve, reject) => {
+        const reader = new FileReader();
+        reader.onload  = e => resolve(e.target.result.split(',')[1]);
+        reader.onerror = () => reject(new Error('Could not read image file.'));
+        reader.readAsDataURL(selectedFile);
+      });
 
-      const rawText = (result.data && result.data.text) ? result.data.text.trim() : '';
+      const mediaType = selectedFile.type || 'image/jpeg';
+
+      // Call Claude API with vision
+      const response = await fetch('https://api.anthropic.com/v1/messages', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          model: 'claude-sonnet-4-6',
+          max_tokens: 2000,
+          messages: [{
+            role: 'user',
+            content: [
+              {
+                type: 'image',
+                source: { type: 'base64', media_type: mediaType, data: base64 }
+              },
+              {
+                type: 'text',
+                text: 'This is a photo of a horse feed label. Extract ALL text from this label as accurately as possible.\n\nReturn ONLY the extracted text, structured exactly as it appears on the label. Preserve section headers (GUARANTEED ANALYSIS, INGREDIENTS, FEEDING DIRECTIONS) and their formatting.\n\nFor GUARANTEED ANALYSIS: extract every row with its value and unit (%, ppm, IU/lb, mg/lb, etc.).\nFor INGREDIENTS: list them in the exact order shown, comma-separated.\nFor FEEDING DIRECTIONS: extract the full text.\n\nDo not add commentary or any text not on the label. If the image is too blurry or the label is not visible, respond with exactly: UNREADABLE'
+              }
+            ]
+          }]
+        })
+      });
+
+      if (!response.ok) {
+        const errData = await response.json().catch(() => ({}));
+        throw new Error((errData && errData.error && errData.error.message) || 'API error ' + response.status);
+      }
+
+      const data = await response.json();
+      const rawText = (data.content && data.content[0] && data.content[0].text)
+        ? data.content[0].text.trim()
+        : '';
 
       hide(ocrStatus);
       isScanning = false;
       if (ocrScanBtn) { ocrScanBtn.disabled = false; ocrScanBtn.textContent = 'Read This Label'; }
 
-      if (!rawText || rawText.length < 10) {
-        showError('Couldn\u2019t read enough text from that photo. Make sure the label is flat, well-lit, and in focus. Try cropping close to the ingredient list.');
+      if (!rawText || rawText === 'UNREADABLE' || rawText.length < 15) {
+        showError('The label could not be read from this photo. Make sure the label is flat, well-lit, and in focus. Try cropping close to the ingredient list and guaranteed analysis panel, then try again.');
         return;
       }
 
-      const cleaned = rawText
-        .replace(/\f/g, '\n')
-        .replace(/[ \t]+/g, ' ')
-        .replace(/\n{3,}/g, '\n\n')
-        .trim();
-
-      feedInputEl.value = cleaned;
+      feedInputEl.value = rawText;
       show(ocrResultMsg);
 
-      // Auto-decode immediately after scan
       setTimeout(function () {
         const decodeBtn = document.getElementById('decodeBtn');
         if (decodeBtn) decodeBtn.click();
       }, 600);
 
     } catch (err) {
-      console.error('Tesseract error:', err);
-      let msg = 'OCR failed. ';
-      if (err && err.message && (err.message.includes('network') || err.message.includes('fetch'))) {
-        msg += 'Check your internet connection and try again.';
+      console.error('Claude Vision OCR error:', err);
+      hide(ocrStatus);
+      isScanning = false;
+      if (ocrScanBtn) { ocrScanBtn.disabled = false; ocrScanBtn.textContent = 'Read This Label'; }
+      let msg = '';
+      if (err.message && err.message.includes('401')) {
+        msg = 'Authentication error. The API key may need to be configured.';
+      } else if (err.message && (err.message.includes('network') || err.message.includes('fetch') || err.message.includes('Failed to fetch'))) {
+        msg = 'Network error — check your internet connection and try again.';
+      } else if (err.message && err.message.includes('rate_limit')) {
+        msg = 'Too many requests — please wait a moment and try again.';
       } else {
-        msg += 'Try a different photo or type in the label text manually below.';
+        msg = 'Could not read the label. ' + (err.message || 'Please try again or type the label text manually below.');
       }
       showError(msg);
     }
