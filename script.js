@@ -1315,7 +1315,44 @@ function decodeLabel(text) {
 
   // ── Guaranteed Analysis Notes — expanded
   const anNotes = [];
-  if (analysis.protein)    anNotes.push(`Crude Protein: ${analysis.protein.value}% (min).`);
+  if (analysis.protein) {
+    const cpVal = analysis.protein.value;
+    // Evaluate protein % against use-case context signals
+    const isSenior      = /senior/i.test(text);
+    const isPerformance = /performance|racing|endurance|sport|eventing/i.test(text);
+    const isGrowing     = /foal|young horse|weanling|yearling|growing/i.test(text);
+    const isLactating   = /lactating|broodmare|nursing|mare and foal/i.test(text);
+    const isBalancer    = /ration balancer/i.test(text);
+
+    let cpContext = '';
+    if (isBalancer) {
+      cpContext = ` — ration balancers typically have high crude protein % because they are fed in small amounts (1–2 lbs/day). The actual daily protein delivered is modest.`;
+    } else if (isGrowing || isLactating) {
+      cpContext = cpVal >= 14
+        ? ` — appropriate range for growing horses or lactating mares, which have higher protein requirements than mature horses at maintenance.`
+        : ` — on the lower end for growing horses or lactating mares. These horses typically need 14–16% crude protein. Review with your vet or nutritionist.`;
+    } else if (isPerformance) {
+      cpContext = cpVal >= 12 && cpVal <= 16
+        ? ` — within typical range for performance horses. Energy (calories) is usually the primary concern for performance horses, not protein.`
+        : cpVal > 16
+        ? ` — high protein for a performance feed. Excess protein is not converted to muscle — it is excreted as ammonia, which increases water requirements and stall ammonia levels.`
+        : ` — lower protein for a performance feed. Verify the amino acid profile (lysine in particular) meets your horse's needs.`;
+    } else if (isSenior) {
+      cpContext = cpVal >= 12
+        ? ` — appropriate for a senior horse feed. Older horses are less efficient at digesting and utilizing protein, so slightly higher crude protein helps maintain muscle mass.`
+        : ` — lower than ideal for a senior feed. Most equine nutritionists recommend senior horses receive at least 12–14% crude protein to compensate for reduced digestive efficiency.`;
+    } else {
+      // Mature horse at maintenance
+      cpContext = cpVal < 8
+        ? ` — below the typical minimum requirement for a mature horse at maintenance (approximately 8–10%). This feed should not be the sole protein source.`
+        : cpVal <= 12
+        ? ` — within the typical range for a mature horse at light to moderate work. Most adult horses at maintenance need approximately 8–10% crude protein in their total diet.`
+        : cpVal <= 16
+        ? ` — moderate-to-high protein for a general purpose feed. Not harmful for healthy adult horses, but excess protein is excreted rather than stored. Horses with kidney disease should avoid high-protein feeds.`
+        : ` — high crude protein. Appropriate for breeding stock, growing horses, or ration balancers. For mature horses at maintenance or light work, this is more protein than needed. Excess protein increases water intake and ammonia excretion.`;
+    }
+    anNotes.push(`Crude Protein: <strong>${cpVal}%</strong> (min)${cpContext}`);
+  }
   if (analysis.fat) {
     const fatVal = analysis.fat.value;
     const fatNote = fatVal < 4
