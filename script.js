@@ -1235,7 +1235,7 @@ function renderIngredientOrderHTML(flags) {
 // First paragraph the consumer reads — narrative,
 // not a list. Tells them what this feed does to a horse.
 // ─────────────────────────────────────────────
-function buildIntroSummary(text, analysis, feedTypes, feedForm, fiberFound, grainFound, fatFound, proteinFound, sugarFound) {
+function buildIntroSummary(text, analysis, feedTypes, feedForm, fiberFound, grainFound, fatFound, proteinFound, sugarFound, profile) {
   const sentences = [];
   const t = text || '';
   const tl = t.toLowerCase();
@@ -1271,14 +1271,37 @@ function buildIntroSummary(text, analysis, feedTypes, feedForm, fiberFound, grai
   const seVal  = analysis && analysis.selenium ? analysis.selenium.value : null;
   const vitEVal = analysis && analysis.vitE ? analysis.vitE.value : null;
 
-  // ── Opening sentence — what it IS
-  let opener = `This is a <strong>${primaryType}</strong>${formNote}.`;
+  // ── Opening — lead with horse profile if provided
+  const useLabels = {
+    pleasure: 'trail or pleasure horse', performance: 'performance horse',
+    senior: 'senior horse', breeding: 'breeding horse', growing: 'young or growing horse', idle: 'retired horse'
+  };
+  const health = profile && profile.health ? profile.health : [];
+  const use    = profile && profile.use    ? profile.use    : null;
+
+  const healthLabels = {
+    ir: 'insulin resistance', laminitis: 'laminitis history', cushings: "Cushing's disease",
+    pssm: 'PSSM / tying-up', ulcers: 'ulcers', hoof: 'hoof quality issues', weight_loss: 'hard keeper'
+  };
+  const healthDesc = health.filter(h => h !== 'none').map(h => healthLabels[h] || h);
+
+  let opener = '';
+  if (use || healthDesc.length) {
+    opener += 'For your <strong>' + (use ? useLabels[use] || use : 'horse') + '</strong>';
+    if (healthDesc.length) {
+      opener += ' with <strong>' + healthDesc.join(', ') + '</strong>';
+    }
+    opener += ', this is a <strong>' + primaryType + '</strong>' + formNote + '.';
+  } else {
+    opener = 'This is a <strong>' + primaryType + '</strong>' + formNote + '.';
+  }
+
   if (feedForm && feedForm.primary === 'pelleted') {
-    opener += ' Pellets are a consistent, dust-free form that horses generally eat readily and that survives storage well.';
+    opener += ' Pellets are consistent, dust-free, and resist sorting — what you feed is what gets eaten.';
   } else if (feedForm && feedForm.primary === 'textured') {
-    opener += ' The textured (sweet feed) form allows horses to sort ingredients, so monitor that your horse is consuming the whole ration.';
+    opener += ' The textured form allows horses to sort ingredients — monitor that the whole ration is being consumed.';
   } else if (feedForm && feedForm.primary === 'extruded') {
-    opener += ' Extruded feeds are cooked under heat and pressure, which gelatinizes starch and improves digestibility.';
+    opener += ' Extruded feeds are cooked under heat and pressure, improving starch digestibility.';
   }
   sentences.push(opener);
 
@@ -2225,7 +2248,8 @@ function decodeLabel(text) {
 
   const introHTML = buildIntroSummary(
     text, analysis, feedTypes, feedForm,
-    fiberFound, grainFound, fatFound, proteinFound, sugarFound
+    fiberFound, grainFound, fatFound, proteinFound, sugarFound,
+    typeof window !== 'undefined' && window.getProfile ? window.getProfile() : {}
   );
 
   return {
