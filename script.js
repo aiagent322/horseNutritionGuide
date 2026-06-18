@@ -1213,9 +1213,32 @@ function decodeLabel(text) {
     </div>`;
   })() : '';
 
+  // ── Ingredient list completeness signal
+  let ingCompletenessHTML = '';
+  if (hasIngList) {
+    const ingList       = parseIngredientOrder(text);
+    const ingCount      = ingList.length;
+    const feedTypeLbl   = feedTypes[0]?.label || '';
+    const isComplexFeed = /performance|senior|complete|balancer|sport|endurance/i.test(feedTypeLbl + text);
+
+    if (ingCount < 5 && isComplexFeed) {
+      ingCompletenessHTML = `<div style="background:#FBF0DC;border:1px solid rgba(200,130,26,0.25);border-radius:6px;padding:9px 13px;margin-top:12px;font-size:0.83rem;color:#5C3A1A;">
+        <strong>&#9888; Short ingredient list for a ${feedTypeLbl}.</strong> Only ${ingCount} ingredient${ingCount !== 1 ? 's' : ''} detected. A formulated feed of this type typically contains 15–40+ ingredients. This may mean the full ingredient list was not included — paste the complete label for the best analysis.
+      </div>`;
+    } else if (ingCount < 8 && isComplexFeed) {
+      ingCompletenessHTML = `<div style="background:#F8F4EE;border:1px solid rgba(200,182,154,0.3);border-radius:6px;padding:9px 13px;margin-top:12px;font-size:0.83rem;color:#5C3A1A;">
+        <strong>Note:</strong> ${ingCount} ingredients detected. If this is a fully formulated commercial feed, the complete ingredient list typically contains more. Confirm the full list was included.
+      </div>`;
+    } else if (ingCount >= 15) {
+      ingCompletenessHTML = `<div style="background:#F2F7F4;border:1px solid rgba(61,122,94,0.2);border-radius:6px;padding:8px 12px;margin-top:12px;font-size:0.81rem;color:#2D5C47;">
+        <strong>&#10003;</strong> ${ingCount} ingredients detected — appears to be a complete ingredient list.
+      </div>`;
+    }
+  }
+
   const feedTypeHTML = noIngBanner + feedTypes.map(ft =>
     `<strong>${ft.label}</strong> <em>(${ft.confidence} confidence)</em><br><span style="font-size:0.88rem">${ft.reason}</span>`
-  ).join('<br><br>') + feedFormHTML;
+  ).join('<br><br>') + feedFormHTML + ingCompletenessHTML;
 
   // ── Energy Sources
   const noIngMsg = '<em style="color:#888;font-size:0.88rem">Ingredient list not detected — paste the full label including the INGREDIENTS section to see energy sources.</em>';
