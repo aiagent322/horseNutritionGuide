@@ -372,17 +372,18 @@ function hasIngredientList(text) {
 
 // ─────────────────────────────────────────────
 // EXTRACT INGREDIENT-SECTION TEXT ONLY
-// Strips the guaranteed analysis block so signal
-// detection doesn't false-positive on "crude fat",
-// "crude fiber", "vitamin e" in analysis numbers
 // ─────────────────────────────────────────────
 function extractIngredientText(text) {
-  // Try to isolate just the ingredients section
+  // Isolate ingredients section by header if present
   const ingMatch = text.match(/ingredients\s*:([\s\S]*?)(?=guaranteed analysis|feeding directions|\n\n\n|$)/i);
   if (ingMatch) return ingMatch[1];
-  // If no clear header, strip lines that look like analysis rows (word + number + %)
+  // No header — strip every line that is an analysis/numeric row
+  const analysisTerms = /^\s*(crude|lysine|methionine|threonine|calcium|phosphorus|magnesium|potassium|iron|selenium|zinc|copper|manganese|vitamin|biotin|lactobacillus|saccharomyces|nsc|sugar|starch|salt|sodium|iodine|cobalt)/i;
+  const numericLine   = /[\d]+\.?[\d]*\s*(%|ppm|iu\/|mg\/|cfu)/i;
   const lines = text.split('\n').filter(line => {
-    return !/^\s*[\w\s&\/()]+\s*[\(\)min\.max]*\s*[\d]+[\.\d]*\s*(%|ppm|iu|mg|cfu)/i.test(line);
+    if (analysisTerms.test(line)) return false;
+    if (numericLine.test(line))   return false;
+    return true;
   });
   return lines.join('\n');
 }
@@ -443,7 +444,19 @@ function decodeLabel(text) {
   const proteinHTML = !hasIngList
     ? noIngMsg
     : proteinFound.length
-      ? `Detected protein sources: ${proteinFound.map(p => pill(p)).join(' ')}<br><br>These appear to be the primary amino acid contributors. When individual amino acids like lysine, methionine, and threonine are listed separately in the guaranteed analysis, it means the manufacturer is guaranteeing specific levels — a sign of a more precisely formulated feed.`
+      ? (() => {
+        const fromAnalysis = proteinFound.filter(p => ['lysine','methionine','threonine'].includes(p.toLowerCase()));
+        const fromIng      = proteinFound.filter(p => !['lysine','methionine','threonine'].includes(p.toLowerCase()));
+        let html = `Detected: ${proteinFound.map(p => pill(p)).join(' ')}<br><br>`;
+        if (fromIng.length && fromAnalysis.length) {
+          html += `Protein ingredients include <strong>${fromIng.join(', ')}</strong>. Individual amino acids (${fromAnalysis.join(', ')}) are also guaranteed — indicating a focus on protein quality, not just crude protein quantity.`;
+        } else if (fromAnalysis.length && !fromIng.length) {
+          html += `No protein ingredient list detected. Individual amino acids (${fromAnalysis.join(', ')}) appear in the guaranteed analysis — the manufacturer is guaranteeing specific amino acid levels, which is a quality indicator. To see actual protein ingredient sources, paste the full ingredient list.`;
+        } else {
+          html += `These appear to be the primary protein sources in this feed.`;
+        }
+        return html;
+      })()
       : 'No recognized protein ingredients detected. Check that the ingredient list was included.';
 
   // ── Fiber
