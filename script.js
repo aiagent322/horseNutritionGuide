@@ -1509,16 +1509,78 @@ function decodeLabel(text) {
       }
     });
   }
-  if (!hasIngList) missing.push('Paste the full ingredient list for a complete analysis — energy sources, fiber, fat, and protein sections cannot be evaluated from the guaranteed analysis alone.');
-  if (!analysis.nsc && !analysis.sugar && !analysis.starch) missing.push('NSC, sugar, and starch values were not detected. Ask the manufacturer — critical for horses with insulin resistance, laminitis, EMS, or PPID/Cushing\'s.');
-  if (!analysis.vitE) missing.push('Vitamin E IU per pound not detected. Important for horses without regular pasture access.');
-  if (!analysis.selenium) missing.push('Selenium level not detected. Ask the manufacturer — selenium has a narrow safe range.');
-  if (!digestFound.length) missing.push('Ask whether the feed contains any digestive support ingredients (yeast culture, probiotics) if gut health is a concern.');
-  if (!analysis.calcium || !analysis.phosphorus) missing.push('Calcium and/or phosphorus not detected — important for evaluating total diet mineral balance.');
-  missing.push('Ask: "What is the recommended daily feeding rate per 100 lbs of body weight?"');
-  missing.push('Ask: "Is this feed tested for actual NSC values, or are those calculated?"');
-  missing.push('Ask: "Is the selenium from inorganic (sodium selenite) or organic (selenium yeast) sources?"');
-  const missingHTML = ul(missing);
+  // ── Dynamic questions — only shown when relevant to what was detected
+
+  // Missing ingredient list
+  if (!hasIngList) {
+    missing.push('Paste the full ingredient list for a complete analysis — energy sources, fiber, fat, and protein sections cannot be evaluated from the guaranteed analysis alone.');
+  }
+
+  // NSC — only ask if not already detected/calculated
+  const nscAlreadyKnown = analysis.nsc || (analysis.sugar && analysis.starch);
+  if (!nscAlreadyKnown) {
+    missing.push(`NSC, sugar, and starch values were not listed. Ask the manufacturer: <em>"What is the tested NSC value?" and "Can you provide sugar (WSC) and starch values separately?"</em> — critical for horses with insulin resistance, laminitis, EMS, or PPID/Cushing's.`);
+  } else if (analysis.sugar && analysis.starch && !analysis.nsc) {
+    missing.push('NSC was calculated from listed sugar + starch values. Ask the manufacturer for the <em>laboratory-tested</em> NSC value to confirm — calculated and tested values sometimes differ.');
+  }
+
+  // Vitamin E — only ask if IU not found
+  if (!analysis.vitE) {
+    missing.push('Vitamin E IU per pound was not found in the pasted text. Ask the manufacturer for this value — important for horses without regular pasture access.');
+  } else {
+    // If found but form not detected
+    const hasVitEForm = /d-alpha|dl-alpha|tocopherol/i.test(text);
+    if (!hasVitEForm) {
+      missing.push('Ask the manufacturer: <em>"Is the Vitamin E in this feed natural (d-alpha-tocopherol) or synthetic (dl-alpha-tocopherol)?"</em> — natural Vitamin E is 2–3× more bioavailable.');
+    }
+  }
+
+  // Selenium — ask about source if not identified, or ask about ppm if not found
+  if (!analysis.selenium) {
+    missing.push('Selenium level (ppm) was not found in the pasted text. Ask the manufacturer — selenium has a narrow safe range and total daily intake from all sources matters.');
+  }
+  const seSourceKnown = /selenium yeast|sodium selenite|selenium proteinate|selenomethionine/i.test(ingText || text);
+  if (!seSourceKnown) {
+    missing.push('Ask the manufacturer: <em>"Is the selenium in this feed organic (selenium yeast/proteinate) or inorganic (sodium selenite)?"</em> — organic forms are more bioavailable.');
+  }
+
+  // Digestive support — only ask if not detected
+  if (!digestFound.length) {
+    missing.push("No digestive support ingredients (yeast culture, probiotics) detected. Ask whether the feed contains any if hindgut health is a concern for your horse.");
+  }
+
+  // Calcium/Phosphorus — only ask if missing
+  if (!analysis.calcium && !analysis.phosphorus) {
+    missing.push("Calcium and phosphorus values were not found. Ask the manufacturer for the Ca:P ratio — important for evaluating total diet mineral balance.");
+  }
+
+  // Feeding rate — only ask if directions not already pasted
+  if (!feedingDir || !feedingDir.rate) {
+    missing.push('Ask: <em>"What is the recommended daily feeding rate per 100 lbs of body weight?"</em>');
+  }
+
+  // High selenium — always ask about total load if elevated
+  if (analysis.selenium && analysis.selenium.value > 0.3) {
+    missing.push(`Selenium is listed above 0.3 ppm. Ask your vet: <em>"What is my horse's total daily selenium intake from feed, hay, and supplements combined?"</em>`);
+  }
+
+  // High iron — ask about hay iron
+  const ironPpmVal = text.match(/iron[^0-9]*([0-9]+\.?[0-9]*)\s*ppm/i);
+  if (ironPpmVal && parseFloat(ironPpmVal[1]) >= 150) {
+    missing.push('Iron is listed at ' + ironPpmVal[1] + ' ppm. Ask your hay supplier or test your hay: <em>"What is the iron level in my hay?"</em> High feed iron combined with high hay iron can suppress copper and zinc absorption.');
+  }
+
+  // Textured feed — ask about meal size
+  if (feedForm && feedForm.primary === 'textured') {
+    missing.push('This appears to be a textured feed. Ask: <em>"What is the maximum safe single meal size?"</em> Large grain meals can overwhelm the small intestine and increase colic risk.');
+  }
+
+  // No ingredient list and no analysis — very little to work with
+  if (!hasIngList && !Object.keys(analysis).length) {
+    missing.push('Very little label information was detected. For the best analysis, paste the full label including the INGREDIENTS section and GUARANTEED ANALYSIS panel.');
+  }
+
+  const missingHTML = missing.length ? ul(missing) : '<em style="color:#888">No specific questions generated — paste the full label for a more complete analysis.</em>';
 
   // ── Plain-English Summary
   const feedTypeLabel = feedTypes[0]?.label || 'commercial horse feed';
