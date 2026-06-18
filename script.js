@@ -363,7 +363,6 @@ function ul(items) {
 // nutrient delivery from analysis values
 // ─────────────────────────────────────────────
 function parseFeedingDirections(text, analysis) {
-  // Try to isolate feeding directions section
   // Find feeding directions section
   const dirIdx = text.search(/feeding\s*directions?/i);
   if (dirIdx < 0) return null;
@@ -371,62 +370,112 @@ function parseFeedingDirections(text, analysis) {
   const dirText = dirRaw.split(/\n\n\n|important:/i)[0].trim();
   if (dirText.length < 10) return null;
 
-  // Extract daily feeding rate — look for lbs/day patterns
-  const lbMatch = dirText.match(/(\d+(?:\.\d+)?)\s*(?:to|-)\s*(\d+(?:\.\d+)?)\s*lbs?/i);
-  const singleLbMatch = dirText.match(/(\d+(?:\.\d+)?)\s*lbs?\s*(?:per\s*day|daily|\/day)/i);
-  const kgMatch  = dirText.match(/(\d+(?:\.\d+)?)\s*(?:to|-)\s*(\d+(?:\.\d+)?)\s*kg/i);
+  // ── Format 1: "X–Y lbs per 100 lbs body weight" — normalize first
+  const per100Match = dirText.match(/(\d+(?:\.\d+)?)\s*(?:to|-)?\s*(\d+(?:\.\d+)?)\s*(?:lbs?|oz)\s*per\s*100\s*(?:lbs?|pounds?)/i);
+  const ozPer100Match = dirText.match(/(\d+(?:\.\d+)?)\s*(?:to|-)?\s*(\d+(?:\.\d+)?)\s*oz(?:s)?\s*per\s*100/i);
 
-  let minLbs = null, maxLbs = null, midLbs = null;
-  if (lbMatch) {
-    minLbs = parseFloat(lbMatch[1]);
-    maxLbs = parseFloat(lbMatch[2]);
+  let minLbs = null, maxLbs = null, midLbs = null, refWeightLbs = 1000;
+  let rateFormat = 'total'; // 'total' = total lbs/day, 'per100' = per 100 lbs BW
+
+  if (per100Match) {
+    // Rate expressed as lbs per 100 lbs body weight — normalize to 1000-lb horse
+    const minPer100 = parseFloat(per100Match[1]);
+    const maxPer100 = parseFloat(per100Match[2] || per100Match[1]);
+    refWeightLbs = 1000;
+    minLbs = (minPer100 / 100) * refWeightLbs;
+    maxLbs = (maxPer100 / 100) * refWeightLbs;
     midLbs = (minLbs + maxLbs) / 2;
-  } else if (singleLbMatch) {
-    minLbs = maxLbs = midLbs = parseFloat(singleLbMatch[1]);
-  } else if (kgMatch) {
-    minLbs = parseFloat(kgMatch[1]) * 2.205;
-    maxLbs = parseFloat(kgMatch[2]) * 2.205;
+    rateFormat = 'per100';
+  } else if (ozPer100Match) {
+    // Rate in oz per 100 lbs — convert oz to lbs (16 oz = 1 lb)
+    const minOzPer100 = parseFloat(ozPer100Match[1]);
+    const maxOzPer100 = parseFloat(ozPer100Match[2] || ozPer100Match[1]);
+    refWeightLbs = 1000;
+    minLbs = (minOzPer100 / 16 / 100) * refWeightLbs;
+    maxLbs = (maxOzPer100 / 16 / 100) * refWeightLbs;
     midLbs = (minLbs + maxLbs) / 2;
+    rateFormat = 'per100oz';
+  } else {
+    // ── Format 2: "X–Y lbs daily for a 1,000 lb horse" — standard total/day
+    const lbRangeMatch  = dirText.match(/(\d+(?:\.\d+)?)\s*(?:to|–|-)\s*(\d+(?:\.\d+)?)\s*lbs?/i);
+    const lbSingleMatch = dirText.match(/(\d+(?:\.\d+)?)\s*lbs?\s*(?:per\s*day|daily|\/day)/i);
+    const kgRangeMatch  = dirText.match(/(\d+(?:\.\d+)?)\s*(?:to|–|-)\s*(\d+(?:\.\d+)?)\s*kg/i);
+
+    if (lbRangeMatch) {
+      minLbs = parseFloat(lbRangeMatch[1]);
+      maxLbs = parseFloat(lbRangeMatch[2]);
+      midLbs = (minLbs + maxLbs) / 2;
+    } else if (lbSingleMatch) {
+      minLbs = maxLbs = midLbs = parseFloat(lbSingleMatch[1]);
+    } else if (kgRangeMatch) {
+      minLbs = parseFloat(kgRangeMatch[1]) * 2.205;
+      maxLbs = parseFloat(kgRangeMatch[2]) * 2.205;
+      midLbs = (minLbs + maxLbs) / 2;
+    }
+
+    // Extract reference horse weight from directions text
+    const weightMatch = dirText.match(/(\d+(?:,\d+)?)\s*(?:lb|pound|kg|kilogram)/i);
+    if (weightMatch) {
+      refWeightLbs = weightMatch[0].toLowerCase().includes('kg')
+        ? parseFloat(weightMatch[1]) * 2.205
+        : parseFloat(weightMatch[1].replace(',', ''));
+    }
   }
 
   if (midLbs === null) return { dirText, rate: null, nutrients: null };
 
-  // Extract horse weight reference
-  const weightMatch = dirText.match(/(\d+(?:,\d+)?)\s*(?:lb|pound|kg|kilogram)/i);
-  const refWeightLbs = weightMatch
-    ? (weightMatch[0].toLowerCase().includes('kg') ? parseFloat(weightMatch[1]) * 2.205 : parseFloat(weightMatch[1].replace(',','')))
-    : 1000; // default 1000 lb horse
+  // ── Normalize rate label
+  const rateLabel = (() => {
+    if (rateFormat === 'per100') {
+      const minP = ((minLbs / refWeightLbs) * 100).toFixed(1);
+      const maxP = ((maxLbs / refWeightLbs) * 100).toFixed(1);
+      return `${minP === maxP ? minP : minP + '–' + maxP} lbs per 100 lbs body weight (~${minLbs.toFixed(1)}–${maxLbs.toFixed(1)} lbs/day for a ${refWeightLbs}-lb horse)`;
+    }
+    if (rateFormat === 'per100oz') {
+      const minOz = ((minLbs * 16 / refWeightLbs) * 100).toFixed(0);
+      const maxOz = ((maxLbs * 16 / refWeightLbs) * 100).toFixed(0);
+      return `${minOz === maxOz ? minOz : minOz + '–' + maxOz} oz per 100 lbs body weight (~${minLbs.toFixed(1)}–${maxLbs.toFixed(1)} lbs/day for a ${refWeightLbs}-lb horse)`;
+    }
+    if (minLbs === maxLbs) return `${minLbs} lbs/day`;
+    return `${minLbs}–${maxLbs} lbs/day`;
+  })();
 
-  // Calculate daily nutrient delivery at mid feeding rate
+  // ── Normalized per-100-lbs rate for comparison (regardless of input format)
+  const lbsPer100 = (midLbs / refWeightLbs) * 100;
+  const ozPer100  = lbsPer100 * 16;
+
+  // ── Daily nutrient delivery at mid feeding rate
   const nutrients = {};
 
   if (analysis.protein) {
-    // Convert % to grams: lbs * 453.6 g/lb * (% / 100)
     const grams = midLbs * 453.6 * (analysis.protein.value / 100);
     nutrients.protein = `~${Math.round(grams)}g crude protein/day`;
   }
 
   if (analysis.selenium) {
-    // ppm = mg/kg; convert lbs to kg first
     const kgFed = midLbs * 0.4536;
     const mgSe  = kgFed * analysis.selenium.value;
-    const safeLimit = 2.0;
-    const pct = Math.round((mgSe / safeLimit) * 100);
-    nutrients.selenium = `~${mgSe.toFixed(2)}mg selenium/day (${pct}% of the commonly cited 2mg/day safe upper limit)`;
+    const pct   = Math.round((mgSe / 2.0) * 100);
+    nutrients.selenium = `~${mgSe.toFixed(2)}mg selenium/day (${pct}% of the commonly cited 2mg/day safe upper limit from all sources)`;
   }
 
   if (analysis.vitE) {
-    // IU/lb × lbs fed
-    const iuDay = midLbs * analysis.vitE.value;
-    const needEstimate = refWeightLbs * 1.5; // ~1.5 IU/lb body weight is common recommendation
-    nutrients.vitE = `~${Math.round(iuDay)} IU Vitamin E/day (a ${refWeightLbs}-lb horse at maintenance may need ~${Math.round(needEstimate)} IU/day from all sources)`;
+    const iuDay       = Math.round(midLbs * analysis.vitE.value);
+    const needEstimate = Math.round(refWeightLbs * 1.5);
+    nutrients.vitE = `~${iuDay} IU Vitamin E/day (a ${refWeightLbs}-lb horse at maintenance may need ~${needEstimate} IU/day from all sources)`;
+  }
+
+  if (analysis.vitA) {
+    const iuADay = Math.round(midLbs * analysis.vitA.value);
+    nutrients.vitA = `~${iuADay.toLocaleString()} IU Vitamin A/day`;
   }
 
   return {
     dirText,
-    rate: minLbs === maxLbs
-      ? `${minLbs} lbs/day`
-      : `${minLbs}–${maxLbs} lbs/day`,
+    rate:       rateLabel,
+    rateFormat,
+    lbsPer100:  Math.round(lbsPer100 * 10) / 10,
+    ozPer100:   Math.round(ozPer100 * 10) / 10,
     midLbs,
     refWeightLbs,
     nutrients
@@ -1795,11 +1844,14 @@ function decodeLabel(text) {
   let feedingDirHTML = '';
   if (feedingDir && feedingDir.rate) {
     const nutLines = Object.values(feedingDir.nutrients || {});
+    const normalizedNote = feedingDir.lbsPer100
+      ? `<br><span style="font-size:0.81rem;color:#2D5C47">Normalized: <strong>${feedingDir.lbsPer100} lbs</strong> (${feedingDir.ozPer100} oz) per 100 lbs body weight</span>`
+      : '';
     feedingDirHTML = `<div style="background:#F2F7F4;border:1px solid rgba(61,122,94,0.2);border-radius:6px;padding:12px 14px;margin-top:14px;">
       <div style="font-size:0.72rem;font-weight:700;letter-spacing:0.1em;text-transform:uppercase;color:#2D5C47;margin-bottom:6px;">Feeding Rate Detected</div>
-      <strong style="color:#1C3A2F">${feedingDir.rate}</strong> (for a ${feedingDir.refWeightLbs}-lb horse)<br>
-      ${nutLines.length ? '<br><strong style="font-size:0.82rem;color:#1C3A2F">Estimated daily nutrient delivery at mid feeding rate:</strong><br>' + nutLines.map(n => `<span style="font-size:0.83rem;color:#3D3D38">• ${n}</span>`).join('<br>') : ''}
-      <br><br><em style="font-size:0.79rem;color:#888">Estimates based on label values — actual amounts vary by exact feeding rate, horse size, and feed density. Always reference the original label and consult your vet or nutritionist for horses with specific health needs.</em>
+      <strong style="color:#1C3A2F">${feedingDir.rate}</strong>${normalizedNote}<br>
+      ${nutLines.length ? '<br><strong style="font-size:0.82rem;color:#1C3A2F">Estimated daily nutrient delivery at mid rate:</strong><br>' + nutLines.map(n => `<span style="font-size:0.83rem;color:#3D3D38">• ${n}</span>`).join('<br>') : ''}
+      <br><br><em style="font-size:0.79rem;color:#888">Estimates based on label values at mid feeding rate. Actual delivery varies by exact rate, horse size, and feed density. Always reference the original label and consult your vet for horses with specific health needs.</em>
     </div>`;
   } else if (feedingDir && feedingDir.dirText) {
     feedingDirHTML = `<div style="background:#F2F7F4;border:1px solid rgba(61,122,94,0.2);border-radius:6px;padding:10px 14px;margin-top:14px;font-size:0.85rem;color:#3D3D38;">
