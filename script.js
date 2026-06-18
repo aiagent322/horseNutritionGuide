@@ -103,7 +103,7 @@ const INGREDIENT_LIBRARY = [
     name: 'Probiotics / Lactobacillus',
     url:  'ingredients/probiotics.html',
     category: 'Digestive Support',
-    desc: 'Live beneficial microorganisms. Intended to support a healthy hindgut bacterial population. Stability and viability in pelleted feeds can vary — a veterinarian or nutritionist can advise on whether a standalone probiotic supplement may be more effective.'
+    desc: 'Live beneficial microorganisms. Intended to support a healthy hindgut bacterial population. Stability and viability in pelleted feeds can vary — a standalone probiotic supplement added at feeding time may deliver more viable organisms than what survives pelleting.'
   },
   {
     name: 'Biotin',
@@ -127,7 +127,7 @@ const INGREDIENT_LIBRARY = [
     name: 'Selenium',
     url:  'ingredients/selenium.html',
     category: 'Mineral / Trace (Critical)',
-    desc: 'An essential antioxidant mineral with a narrow safe range. Deficiency causes muscle problems (white muscle disease); excess causes toxicity (selenosis). Selenium content on labels is expressed in mg/kg or ppm. Soil selenium levels vary widely by region, making this a key item to discuss with your vet or nutritionist.'
+    desc: 'An essential antioxidant mineral with a narrow safe range. Deficiency causes muscle problems (white muscle disease); excess causes toxicity (selenosis). Selenium content on labels is expressed in mg/kg or ppm. Soil selenium levels vary widely by region, know your regional soil selenium levels and calculate total daily selenium from feed + hay + supplements.'
   },
   {
     name: 'Vitamin E',
@@ -527,13 +527,13 @@ function detectRedFlags(text, ingText, analysis) {
       flags.push({
         level: 'critical',
         title: 'High Iron + Low Copper',
-        detail: `Iron is listed at ${ironPpm} ppm and copper at only ${copperPpm} ppm. Iron competes with copper for absorption — high iron can significantly reduce how much copper your horse actually absorbs, even if the listed copper value looks adequate. This combination warrants a diet review with an equine nutritionist, especially if your hay source is also high in iron.`
+        detail: `Iron is listed at ${ironPpm} ppm and copper at only ${copperPpm} ppm. Iron competes with copper for absorption — high iron can significantly reduce how much copper your horse actually absorbs, even if the listed copper value looks adequate. If your hay is also high in iron (common in many regions), the combined iron load can meaningfully suppress copper absorption — consider having your hay tested.`
       });
     } else if (zincPpm !== null && zincPpm < 100) {
       flags.push({
         level: 'caution',
         title: 'High Iron + Low Zinc',
-        detail: `Iron is listed at ${ironPpm} ppm and zinc at ${zincPpm} ppm. Excess iron can interfere with zinc absorption. Combined with potentially high iron in hay (common in many regions), total iron load may be a concern. Ask your vet or nutritionist about your hay's iron levels.`
+        detail: `Iron is listed at ${ironPpm} ppm and zinc at ${zincPpm} ppm. Excess iron can interfere with zinc absorption. Combined with potentially high iron in hay (common in many regions), total iron load may be a concern. Hay testing (services like Equi-Analytical) will tell you your hay's iron level — worth knowing if your horse has coat color fading or poor hoof quality.`
       });
     } else if (copperPpm === null && zincPpm === null) {
       flags.push({
@@ -579,7 +579,7 @@ function detectRedFlags(text, ingText, analysis) {
       flags.push({
         level: 'caution',
         title: 'Inorganic Selenium at Elevated Level',
-        detail: `Sodium selenite is the only selenium source detected, listed at ${seVal} ppm. Inorganic selenium has a narrower margin between adequate and toxic levels than organic forms. Total daily selenium from all sources (feed + hay + supplements) should be reviewed with your vet.`
+        detail: `Sodium selenite is the only selenium source detected, listed at ${seVal} ppm. Inorganic selenium has a narrower margin between adequate and toxic levels than organic forms. Calculate total daily selenium: feed ppm × daily kg fed = mg from feed. Add hay and supplement contributions. Stay below 2 mg/day total.`
       });
     }
   }
@@ -589,7 +589,7 @@ function detectRedFlags(text, ingText, analysis) {
     flags.push({
       level: 'critical',
       title: 'Urea / Non-Protein Nitrogen Detected',
-      detail: 'Urea or non-protein nitrogen (NPN) is present in the ingredient list. Unlike ruminants (cattle, sheep), horses cannot efficiently utilize NPN as a protein source — their digestive system is not designed for it. Urea in horse feed provides no usable protein and at high levels can be harmful. Consult your vet or nutritionist before feeding this to horses.'
+      detail: 'Urea or non-protein nitrogen (NPN) is present in the ingredient list. Unlike ruminants (cattle, sheep), horses cannot efficiently utilize NPN as a protein source — their digestive system is not designed for it. Urea in horse feed provides no usable protein and at high levels can be harmful. Look for a feed without urea — horses digest real protein sources like soybean meal far more effectively.'
     });
   }
 
@@ -601,7 +601,7 @@ function detectRedFlags(text, ingText, analysis) {
     flags.push({
       level: 'caution',
       title: 'High Calcium — Alfalfa + Limestone Both Present',
-      detail: `Both alfalfa (a high-calcium ingredient) and limestone (added calcium) are present, and calcium is listed at ${caMin}% (min). This is a high-calcium feed. When fed alongside alfalfa hay, total dietary calcium can become excessive and may interfere with phosphorus and magnesium balance. Discuss total diet calcium with your vet or nutritionist.`
+      detail: `Both alfalfa (a high-calcium ingredient) and limestone (added calcium) are present, and calcium is listed at ${caMin}% (min). This is a high-calcium feed. When fed alongside alfalfa hay, total dietary calcium can become excessive and may interfere with phosphorus and magnesium balance. If feeding alongside alfalfa hay, watch the Ca:P ratio — aim for 1.5–2:1 calcium to phosphorus across the whole diet.`
     });
   }
 
@@ -1357,7 +1357,7 @@ function buildIntroSummary(text, analysis, feedTypes, feedForm, fiberFound, grai
     const nscSource = nscM ? 'listed on the label' : 'calculated from the listed sugar and starch values';
     let nscSent = `The NSC (non-structural carbohydrates — sugar + starch combined) is <strong>approximately ${nscVal}%</strong> (${nscSource}).`;
     if (nscVal <= 10) {
-      nscSent += ` This is low-NSC — potentially suitable for horses with insulin resistance, EMS, laminitis, Cushing's, or PSSM, though always confirm with your vet.`;
+      nscSent += ` This is low-NSC — a good fit for easy keepers, horses with laminitis history, or horses that do poorly on high-starch diets.`;
     } else if (nscVal <= 15) {
       nscSent += ` This is moderate. Use caution with insulin-sensitive horses and verify this fits within their total daily NSC budget.`;
     } else {
@@ -1527,7 +1527,7 @@ function decodeLabel(text) {
   // ── NSC helper: render a value with color-coded risk language
   function nscRiskNote(val, source) {
     const risk = val <= 10
-      ? { label: 'Low', color: '#1C3A2F', bg: '#E8F2ED', note: 'Generally considered safe for most horses including those with insulin resistance or laminitis history. Always verify with your vet.' }
+      ? { label: 'Low', color: '#1C3A2F', bg: '#E8F2ED', note: 'A good fit for easy keepers and horses with laminitis history — low sugar and starch means less insulin demand.' }
       : val <= 15
       ? { label: 'Moderate-Low', color: '#5C3A1A', bg: '#FBF0DC', note: 'May be appropriate for horses in light to moderate work without metabolic concerns. Use caution with insulin-resistant or laminitis-risk horses.' }
       : val <= 20
@@ -1652,7 +1652,7 @@ function decodeLabel(text) {
     if (analysis.vitD) {
       const vitDVal = analysis.vitD.value;
       const vitDNote = vitDVal > 3000
-        ? `Vitamin D listed at <strong>${vitDVal.toLocaleString()} IU/lb</strong> — elevated level. Vitamin D is the most toxic of the fat-soluble vitamins when oversupplemented. It causes calcium to be deposited in soft tissues (calcification of arteries, lungs, kidneys). Horses that spend time outdoors synthesize Vitamin D from sunlight — if your horse has significant outdoor access, total Vitamin D from all sources should be reviewed with your vet.`
+        ? `Vitamin D listed at <strong>${vitDVal.toLocaleString()} IU/lb</strong> — elevated level. Vitamin D is the most toxic of the fat-soluble vitamins when oversupplemented. It causes calcium to be deposited in soft tissues (calcification of arteries, lungs, kidneys). Horses that spend time outdoors synthesize Vitamin D from sunlight — if your horse has significant outdoor access, they're synthesizing Vitamin D from sunlight — supplemental Vitamin D from feed stacks on top of that.`
         : vitDVal >= 500
         ? `Vitamin D listed at <strong>${vitDVal.toLocaleString()} IU/lb</strong> — a standard fortification level. Horses with regular outdoor access synthesize Vitamin D from sunlight, so supplementation from feed alone at this level is generally not a concern.`
         : `Vitamin D listed at <strong>${vitDVal.toLocaleString()} IU/lb</strong> — low fortification. Horses kept primarily indoors or in limited sunlight may need additional Vitamin D.`;
@@ -1676,7 +1676,7 @@ function decodeLabel(text) {
       } else if (hasSynthetic && !hasNatural) {
         vitEFormNote = `<div style="background:#FBF0DC;border:1px solid rgba(200,130,26,0.2);border-radius:6px;padding:8px 12px;margin-top:6px;font-size:0.85rem;color:#5C3A1A;">
           <strong>Vitamin E form: Synthetic (dl-alpha-tocopherol).</strong><br>
-          Synthetic Vitamin E is less bioavailable than natural forms — the horse must consume more IU to achieve the same tissue levels. If your horse has specific Vitamin E needs (EMND, EPM recovery, muscle issues), discuss the form with your vet. Some horses on synthetic forms may not achieve adequate tissue levels despite label IU values.
+          Synthetic Vitamin E is less bioavailable than natural forms — the horse must consume more IU to achieve the same tissue levels. For horses with muscle issues or poor recovery from work, natural d-alpha-tocopherol is the better choice — look for it specifically on the label. Some horses on synthetic forms may not achieve adequate tissue levels despite label IU values.
         </div>`;
       } else if (hasNatural && hasSynthetic) {
         vitEFormNote = `<div style="background:#F8F4EE;border:1px solid rgba(200,182,154,0.35);border-radius:6px;padding:8px 12px;margin-top:6px;font-size:0.85rem;color:#5C3A1A;">
@@ -1756,9 +1756,9 @@ function decodeLabel(text) {
 
       // ── Selenium level note
       const seLevelNote = seVal > 0.5
-        ? `Selenium listed at <strong>${seVal} ppm</strong> — notably above the commonly cited NRC safe upper limit of 0.3 mg/kg in feed. This is not necessarily dangerous at normal feeding rates, but total daily selenium from all sources (feed + hay + supplements) <strong>must</strong> be reviewed with your vet. Selenium toxicity is a real and serious risk.`
+        ? `Selenium listed at <strong>${seVal} ppm</strong> — notably above the commonly cited NRC safe upper limit of 0.3 mg/kg in feed. This is not necessarily dangerous at normal feeding rates, but total daily selenium from all sources (feed + hay + supplements combined) should stay below 2 mg/day. Calculate it: ppm × kg fed daily = mg from this feed alone.`
         : seVal > 0.3
-        ? `Selenium listed at <strong>${seVal} ppm</strong> — above the commonly cited NRC safe upper limit of 0.3 mg/kg in feed. Total daily selenium from all sources (feed + hay + supplements) should be reviewed with your vet.`
+        ? `Selenium listed at <strong>${seVal} ppm</strong> — above the commonly cited NRC safe upper limit of 0.3 mg/kg in feed. Keep total daily selenium below 2 mg/day from all sources combined — calculate: ppm × kg fed = mg from this feed.`
         : `Selenium listed at <strong>${seVal} ppm</strong> — within the commonly cited safe range for feed selenium. Total daily selenium from all sources should stay below approximately 2 mg/day for most horses.`;
 
       notes.push(seLevelNote + seSource);
@@ -1848,7 +1848,7 @@ function decodeLabel(text) {
     // Count distinct strains/species if multiple bacteria found
     const strainCount = probioticBacteria.length;
     if (strainCount >= 3) {
-      html += `<br><br><em style="font-size:0.82rem;color:#6B6B64">This feed contains ${strainCount} distinct bacterial strains — a multi-strain probiotic approach. Research on multi-strain vs single-strain efficacy in horses is limited; discuss with your vet if gut health is a primary concern.</em>`;
+      html += `<br><br><em style="font-size:0.82rem;color:#6B6B64">This feed contains ${strainCount} distinct bacterial strains — a multi-strain probiotic approach. Research on multi-strain vs single-strain efficacy in horses is limited; a targeted probiotic paste during high-stress periods (travel, competition, dietary changes) is often more effective than relying on feed-based probiotics alone.</em>`;
     }
 
     return html;
@@ -1899,7 +1899,7 @@ function decodeLabel(text) {
     const supportScore = (hasBiotin ? 2 : 0) + (hasOmega ? 2 : 0) + (hasMethionine ? 1 : 0) + (hasChelate ? 1 : 0);
     let strengthNote = '';
     if (supportScore >= 4) {
-      strengthNote = '<br><em style="font-size:0.82rem;color:#2D5C47">This feed has a strong hoof and coat support profile — biotin, omega-3s, and/or methionine are all present. Horses with active hoof or coat concerns may not need additional targeted supplementation, but verify with your vet.</em>';
+      strengthNote = '<br><em style="font-size:0.82rem;color:#2D5C47">This feed has a strong hoof and coat support profile — biotin, omega-3s, and/or methionine are all present. Horses with active hoof concerns may not need additional targeted supplementation on top of this feed.</em>';
     } else if (supportScore >= 2) {
       strengthNote = '<br><em style="font-size:0.82rem;color:#6B6B64">Moderate hoof and coat support detected. Horses with active hoof wall issues or coat problems may benefit from additional targeted supplementation.</em>';
     } else {
@@ -1927,7 +1927,7 @@ function decodeLabel(text) {
     } else if (isGrowing || isLactating) {
       cpContext = cpVal >= 14
         ? ` — appropriate range for growing horses or lactating mares, which have higher protein requirements than mature horses at maintenance.`
-        : ` — on the lower end for growing horses or lactating mares. These horses typically need 14–16% crude protein. Review with your vet or nutritionist.`;
+        : ` — on the lower end for growing horses or lactating mares. These horses typically need 14–16% crude protein. Look for a feed specifically formulated for growth with 14–16% crude protein.`;
     } else if (isPerformance) {
       cpContext = cpVal >= 12 && cpVal <= 16
         ? ` — within typical range for performance horses. Energy (calories) is usually the primary concern for performance horses, not protein.`
@@ -2033,7 +2033,7 @@ function decodeLabel(text) {
       <div style="font-size:0.72rem;font-weight:700;letter-spacing:0.1em;text-transform:uppercase;color:#2D5C47;margin-bottom:6px;">Feeding Rate Detected</div>
       <strong style="color:#1C3A2F">${feedingDir.rate}</strong>${normalizedNote}<br>
       ${nutLines.length ? '<br><strong style="font-size:0.82rem;color:#1C3A2F">Estimated daily nutrient delivery at mid rate:</strong><br>' + nutLines.map(n => `<span style="font-size:0.83rem;color:#3D3D38">• ${n}</span>`).join('<br>') : ''}
-      <br><br><em style="font-size:0.79rem;color:#888">Estimates based on label values at mid feeding rate. Actual delivery varies by exact rate, horse size, and feed density. Always reference the original label and consult your vet for horses with specific health needs.</em>
+      <br><br><em style="font-size:0.79rem;color:#888">Estimates based on label values at mid feeding rate. Actual delivery varies by exact rate, horse size, and feed density. Always reference the original label and adjust feeding rate based on your horse's body condition.</em>
     </div>`;
   } else if (feedingDir && feedingDir.dirText) {
     feedingDirHTML = `<div style="background:#F2F7F4;border:1px solid rgba(61,122,94,0.2);border-radius:6px;padding:10px 14px;margin-top:14px;font-size:0.85rem;color:#3D3D38;">
@@ -2051,7 +2051,7 @@ function decodeLabel(text) {
   if (redFlags.length) {
     redFlags.forEach(f => {
       if (f.level === 'critical') {
-        missing.push(`<strong style="color:#8B2E00">⚠ ${f.title} — review this with your vet before feeding.</strong>`);
+        missing.push(`<strong style="color:#8B2E00">⚠ ${f.title} — see the red flag detail above.</strong>`);
       }
     });
   }
@@ -2107,7 +2107,7 @@ function decodeLabel(text) {
 
   // High selenium — always ask about total load if elevated
   if (analysis.selenium && analysis.selenium.value > 0.3) {
-    missing.push(`Selenium is listed above 0.3 ppm. Ask your vet: <em>"What is my horse's total daily selenium intake from feed, hay, and supplements combined?"</em>`);
+    missing.push(`Selenium is listed above 0.3 ppm. Calculate total daily selenium: (ppm × daily lbs × 0.4536) = mg from this feed. Add hay and supplement contributions. Total should stay below 2 mg/day.`);
   }
 
   // High iron — ask about hay iron
@@ -2152,7 +2152,7 @@ function decodeLabel(text) {
         sentences.push(`Crude fat is <strong>${f}%</strong>${f >= 10 ? ' — meaningful fat content that adds caloric density' : f < 4 ? ' — low fat; this is not a fat-based energy feed' : ''}.`);
       }
       if (analysis.selenium && analysis.selenium.value > 0.3) {
-        sentences.push(`Selenium is listed at <strong>${analysis.selenium.value} ppm</strong> — above the commonly cited 0.3 mg/kg safe upper limit for feed. Total selenium from all sources should be reviewed with your vet.`);
+        sentences.push(`Selenium is listed at <strong>${analysis.selenium.value} ppm</strong> — above the commonly cited 0.3 mg/kg safe upper limit for feed. Add up selenium from feed + hay + supplements — total should stay below 2 mg/day.`);
       }
       if (allVitamins.length >= 4 || allMinerals.length >= 4) {
         sentences.push('The analysis shows a broad vitamin and mineral profile — consistent with a fully formulated commercial feed rather than a raw grain.');
@@ -2205,7 +2205,7 @@ function decodeLabel(text) {
 
       // Selenium flag
       if (analysis.selenium && analysis.selenium.value > 0.3) {
-        sentences.push(`Selenium is <strong>${analysis.selenium.value} ppm</strong> — above the commonly cited safe limit for feed. Total selenium from all sources must be reviewed with your vet.`);
+        sentences.push(`Selenium is <strong>${analysis.selenium.value} ppm</strong> — above the commonly cited safe limit for feed. Add up selenium from feed + hay + supplements — total should stay below 2 mg/day.`);
       }
 
       // Digestive support
@@ -2228,7 +2228,7 @@ function decodeLabel(text) {
       }
 
       // Closing
-      sentences.push('<br>Ingredient order on labels indicates relative quantity by weight — the first ingredient is present in the largest amount. For any horse with a known health condition, share this label with a veterinarian or equine nutritionist before feeding.');
+      sentences.push('<br>Ingredient order on labels indicates relative quantity by weight — the first ingredient is present in the largest amount. The ingredient order on labels shows relative quantity by weight — the first ingredient is present in the largest amount.');
     }
 
     return sentences.filter(Boolean).join(' ');
@@ -2675,11 +2675,11 @@ document.addEventListener('DOMContentLoaded', function () {
     if (hasIR) {
       if (effectiveNSC !== null) {
         if (effectiveNSC > 12) {
-          flags.push({ type: 'caution', text: `NSC is approximately ${effectiveNSC}% — above the recommended 10–12% threshold for insulin-resistant and laminitis-risk horses. Metabolic horses typically need diets below 10–12% NSC — this is a concern worth discussing with your vet or nutritionist.` });
+          flags.push({ type: 'caution', text: `NSC is approximately ${effectiveNSC}% — above the recommended 10–12% threshold for insulin-resistant and laminitis-risk horses. Metabolic horses and easy keepers do best below 10–12% NSC — this feed at ~${effectiveNSC}% is on the higher end for those horses.` });
         } else if (effectiveNSC <= 10) {
-          flags.push({ type: 'ok', text: `NSC appears to be ${effectiveNSC}% — within the commonly recommended range for metabolic horses. Still verify with your vet and confirm the tested (not calculated) NSC value before feeding.` });
+          flags.push({ type: 'ok', text: `NSC appears to be ${effectiveNSC}% — within the commonly recommended range for metabolic horses. Ask the manufacturer for the tested (lab-verified) NSC value to confirm — calculated values from starch + sugar are estimates.` });
         } else {
-          flags.push({ type: 'warn', text: `NSC appears to be ${effectiveNSC}% — borderline for a horse with insulin resistance or laminitis history. Discuss with your vet before feeding.` });
+          flags.push({ type: 'warn', text: `NSC appears to be ${effectiveNSC}% — borderline for a horse with insulin resistance or laminitis history. Ask the manufacturer for the exact tested NSC value to decide.` });
         }
       } else if (hasGrainLead) {
         flags.push({ type: 'caution', text: `Grain ingredients appear near the top of the ingredient list, and NSC is not listed. For a horse with insulin resistance, Cushing\'s, or laminitis history, get the tested NSC, sugar, and starch values from the manufacturer before feeding to a metabolic horse.` });
@@ -2698,9 +2698,9 @@ document.addEventListener('DOMContentLoaded', function () {
       if (hasGrainLead) {
         flags.push({ type: 'caution', text: `Horses with PSSM or recurring tying-up require very low starch and sugar. Grain ingredients appear near the top of this label. this grain-forward profile is a concern for horses with PSSM or tying-up history, who typically need very low-starch diets.` });
       } else if (effectiveNSC !== null && effectiveNSC > 10) {
-        flags.push({ type: 'caution', text: `PSSM and tying-up horses typically need NSC below 10%. This feed appears to be approximately ${effectiveNSC}% NSC. Discuss with your vet or equine nutritionist.` });
+        flags.push({ type: 'caution', text: `PSSM and tying-up horses typically need NSC below 10%. This feed appears to be approximately ${effectiveNSC}% NSC — horses with muscle conditions that tie up do best well below 10% NSC.` });
       } else if (hasFiberLead && (effectiveNSC === null || effectiveNSC <= 10)) {
-        flags.push({ type: 'ok', text: `Fiber ingredients lead the list${effectiveNSC ? ` and NSC appears to be ${effectiveNSC}%` : ''} — a potentially suitable profile for a PSSM or tying-up horse. Confirm NSC with the manufacturer and discuss with your vet.` });
+        flags.push({ type: 'ok', text: `Fiber ingredients lead the list${effectiveNSC ? ` and NSC appears to be ${effectiveNSC}%` : ''} — a lower-starch profile that works well for horses that tie up or have muscle sensitivities. Ask the manufacturer for the exact tested NSC to confirm it fits a low-starch program.` });
       }
     }
 
@@ -2758,7 +2758,7 @@ document.addEventListener('DOMContentLoaded', function () {
       if (hasProbiotic) {
         flags.push({ type: 'ok', text: `Digestive support ingredients (yeast culture, probiotics) are present — beneficial for a horse with ulcer or digestive history.` });
       } else {
-        flags.push({ type: 'warn', text: `No digestive support ingredients detected. For a horse with ulcer or digestive history, feeds with added yeast culture, probiotics, or prebiotics are generally preferred. Ask the manufacturer or discuss with your vet.` });
+        flags.push({ type: 'warn', text: `No digestive support ingredients detected. For a horse with ulcer or digestive history, feeds with added yeast culture, probiotics, or prebiotics are generally preferred. Ask the manufacturer whether a probiotic is added post-pelleting — or consider adding yeast culture separately.` });
       }
       if (hasGrainLead) {
         flags.push({ type: 'warn', text: `Grain-forward feeds can contribute to hindgut acidosis and may aggravate ulcer-prone horses. Consider whether a fiber-forward or lower-starch option would be more suitable.` });
@@ -2798,7 +2798,7 @@ document.addEventListener('DOMContentLoaded', function () {
 
     // ── BREEDING / PREGNANT
     if (use === 'breeding') {
-      flags.push({ type: 'warn', text: `Pregnant and lactating mares have significantly elevated protein, energy, vitamin, and mineral requirements — especially in the last trimester and during lactation. Confirm this feed is appropriate for your mare\'s specific stage with your vet or equine nutritionist.` });
+      flags.push({ type: 'warn', text: `Pregnant and lactating mares have significantly elevated protein, energy, vitamin, and mineral requirements — especially in the last trimester and during lactation. Look for a feed specifically formulated for broodmares or growth — protein, calcium, and phosphorus needs shift significantly in late gestation and lactation.` });
     }
 
     // ── LIMITED FORAGE
@@ -2812,7 +2812,7 @@ document.addEventListener('DOMContentLoaded', function () {
 
     // ── If no specific flags generated
     if (!flags.length) {
-      flags.push({ type: 'ok', text: `No major concerns detected for a ${useLabel} based on the information provided. Review the full breakdown below and share this label with your vet or equine nutritionist if you have any questions.` });
+      flags.push({ type: 'ok', text: `No major concerns detected for a ${useLabel} based on the information provided. Review the full breakdown below — each card explains what those ingredients do.` });
     }
 
     // ── Build HTML
