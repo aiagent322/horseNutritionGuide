@@ -2403,8 +2403,8 @@ document.addEventListener('DOMContentLoaded', function () {
 (function () {
   'use strict';
 
-  // ── Collect current profile selections
-  function getProfile() {
+  // ── Collect current profile selections (global for other modules)
+  window.getProfile = function getProfile() {
     const profile = {};
     document.querySelectorAll('.profile-options[data-group]').forEach(function (group) {
       const key      = group.getAttribute('data-group');
@@ -2711,202 +2711,6 @@ document.addEventListener('DOMContentLoaded', function () {
 })();
 
 // ─────────────────────────────────────────────
-// FEED LABEL LIBRARY SEARCH
-// ─────────────────────────────────────────────
-(function () {
-  'use strict';
-
-  // Wire up library search on DOMContentLoaded
-  document.addEventListener('DOMContentLoaded', function () {
-
-    const searchInput  = document.getElementById('librarySearchInput');
-    const searchBtn    = document.getElementById('librarySearchBtn');
-    const resultMsg    = document.getElementById('libraryResultMsg');
-    const suggestions  = document.getElementById('librarySuggestions');
-    const feedInput    = document.getElementById('feedInput');
-    const decodeBtn    = document.getElementById('decodeBtn');
-
-    if (!searchInput || typeof FEED_LABEL_LIBRARY === 'undefined') return;
-
-    // ── Show popular feeds as suggestion chips on focus
-    searchInput.addEventListener('focus', function () {
-      if (searchInput.value.trim().length > 0) return;
-      showSuggestions(getFeedLibraryNames().slice(0, 8));
-    });
-
-    // ── Live search as user types
-    searchInput.addEventListener('input', function () {
-      const q = searchInput.value.trim();
-      if (q.length < 2) {
-        if (q.length === 0) showSuggestions(getFeedLibraryNames().slice(0, 8));
-        else hideSuggestions();
-        hideResult();
-        return;
-      }
-
-      // Filter suggestions matching query
-      const matches = getFeedLibraryNames().filter(function (name) {
-        return name.toLowerCase().includes(q.toLowerCase());
-      });
-      if (matches.length > 0 && matches.length < 15) {
-        showSuggestions(matches.slice(0, 6));
-      } else {
-        hideSuggestions();
-      }
-    });
-
-    // ── Enter key triggers search
-    searchInput.addEventListener('keydown', function (e) {
-      if (e.key === 'Enter') { e.preventDefault(); doSearch(); }
-    });
-
-    // ── Search button
-    searchBtn.addEventListener('click', doSearch);
-
-    function doSearch() {
-      const q = searchInput.value.trim();
-      if (!q) return;
-      const result = searchFeedLibrary(q);
-      if (result) {
-        loadFromLibrary(result.name, result.labelText);
-      } else {
-        showNotFound(q);
-      }
-    }
-
-    function loadFromLibrary(name, labelText, skipScroll) {
-      // Populate textarea and trigger decode
-      feedInput.value = labelText;
-      showResult(name);
-      hideSuggestions();
-
-      // Scroll to decode button
-      if (!skipScroll) {
-        setTimeout(function () {
-          const profileSection = document.getElementById('horseProfile');
-          if (profileSection) {
-            profileSection.scrollIntoView({ behavior: 'smooth', block: 'start' });
-          }
-        }, 150);
-      }
-
-      // Auto-decode after brief delay
-      setTimeout(function () {
-        if (decodeBtn) decodeBtn.click();
-      }, 400);
-    }
-
-    function showResult(name) {
-      resultMsg.className = 'library-result-msg found';
-      resultMsg.innerHTML = '&#10003; <strong>' + name + '</strong> found in library — label text loaded. Scroll down to see your breakdown.';
-      resultMsg.style.display = 'block';
-    }
-
-    function showNotFound(q) {
-      resultMsg.className = 'library-result-msg not-found';
-      resultMsg.innerHTML = 'Not in library yet: <strong>' + q + '</strong>. Use the camera or paste the label text below — or check spelling.';
-      resultMsg.style.display = 'block';
-      hideSuggestions();
-    }
-
-    function hideResult() {
-      resultMsg.style.display = 'none';
-    }
-
-    function showSuggestions(names) {
-      suggestions.innerHTML = names.map(function (name) {
-        return '<button class="library-suggestion-btn" data-name="' + name.replace(/"/g, '&quot;') + '">' + name + '</button>';
-      }).join('');
-      suggestions.style.display = 'flex';
-
-      // Wire up suggestion clicks
-      suggestions.querySelectorAll('.library-suggestion-btn').forEach(function (btn) {
-        btn.addEventListener('click', function () {
-          const name = this.getAttribute('data-name');
-          searchInput.value = name;
-          const result = searchFeedLibrary(name);
-          if (result) loadFromLibrary(result.name, result.labelText);
-        });
-      });
-    }
-
-    function hideSuggestions() {
-      suggestions.style.display = 'none';
-      suggestions.innerHTML = '';
-    }
-
-    // ── Hook into OCR flow — after OCR extracts text, check if it matches library
-    // Patch the global resetOCR to also reset library result
-    const origResetOCR = window.resetOCR;
-    window.resetOCR = function () {
-      if (origResetOCR) origResetOCR();
-      hideResult();
-      searchInput.value = '';
-    };
-
-    // ── After OCR populates feedInput, check if text matches a known feed
-    // We watch for the ocrResultMsg to appear, then try a library match on the extracted text
-    const ocrResultMsg = document.getElementById('ocrResultMsg');
-    if (ocrResultMsg) {
-      const observer = new MutationObserver(function (mutations) {
-        mutations.forEach(function (m) {
-          if (m.type === 'attributes' && m.attributeName === 'style') {
-            const isVisible = ocrResultMsg.style.display !== 'none';
-            if (isVisible && feedInput.value.trim().length > 20) {
-              tryLibraryMatchOnOCRText(feedInput.value);
-            }
-          }
-        });
-      });
-      observer.observe(ocrResultMsg, { attributes: true });
-    }
-
-    function tryLibraryMatchOnOCRText(ocrText) {
-      // Try to identify the brand and product from the extracted text
-      // Check if any library feed name appears in the OCR text
-      const names = getFeedLibraryNames();
-      for (const name of names) {
-        const nameParts = name.toLowerCase().split(' ').filter(function (w) { return w.length > 3; });
-        const textLower = ocrText.toLowerCase();
-        const matchCount = nameParts.filter(function (w) { return textLower.includes(w); }).length;
-        if (matchCount >= Math.min(3, nameParts.length)) {
-          // Strong match — offer to use library version instead
-          offerLibraryVersion(name);
-          return;
-        }
-      }
-    }
-
-    function offerLibraryVersion(name) {
-      resultMsg.className = 'library-result-msg found';
-      resultMsg.innerHTML = '&#128218; We recognized <strong>' + name + '</strong> — use our verified label text instead for better accuracy? ' +
-        '<button onclick="useLibraryVersion(\'' + name.replace(/'/g, "\\'") + '\')" style="margin-left:8px;padding:4px 10px;background:var(--green-mid);color:white;border:none;border-radius:4px;cursor:pointer;font-size:0.82rem;font-weight:600;">Use Library Version</button>' +
-        '<button onclick="document.getElementById(\'libraryResultMsg\').style.display=\'none\'" style="margin-left:6px;padding:4px 10px;background:transparent;color:inherit;border:1px solid currentColor;border-radius:4px;cursor:pointer;font-size:0.82rem;">Keep OCR Text</button>';
-      resultMsg.style.display = 'block';
-    }
-
-    // Global function for the inline button
-    window.useLibraryVersion = function (name) {
-      const result = searchFeedLibrary(name);
-      if (result) {
-        feedInput.value = result.labelText;
-        showResult(name);
-        setTimeout(function () { if (decodeBtn) decodeBtn.click(); }, 300);
-      }
-    };
-
-    // ── Close suggestions when clicking outside
-    document.addEventListener('click', function (e) {
-      if (!e.target.closest('#librarySearchWrap')) {
-        hideSuggestions();
-      }
-    });
-
-  });
-
-})();
-
-// ─────────────────────────────────────────────
 // LIBRARY DROPDOWN + RATION BUILDER + SHARE
 // ─────────────────────────────────────────────
 (function () {
@@ -3006,7 +2810,7 @@ document.addEventListener('DOMContentLoaded', function () {
     // ── Ration analyze
     if (rationAnalyzeBtn) {
       rationAnalyzeBtn.addEventListener('click', function () {
-        const profile = getProfile();
+        const profile = window.getProfile();
         const result  = window.analyzeRation(rationFeeds, profile);
         if (result && rationOutput) {
           rationOutput.innerHTML = window.renderRationAnalysis(result);
@@ -3182,23 +2986,12 @@ document.addEventListener('DOMContentLoaded', function () {
     rationAnalyzeBtn.style.display = hasTwo ? 'block' : 'none';
   }
 
-  // ── Horse profile: get current selections
-  function getProfile() {
-    const profile = {};
-    document.querySelectorAll('.profile-options[data-group]').forEach(function (group) {
-      const key     = group.getAttribute('data-group');
-      const isMulti = group.getAttribute('data-multi') === 'true';
-      const sel     = Array.from(group.querySelectorAll('.profile-btn.selected, .profile-btn.selected-caution'))
-                          .map(function (b) { return b.getAttribute('data-value'); });
-      profile[key] = isMulti ? sel : (sel[0] || null);
-    });
-    return profile;
-  }
+  // window.getProfile() is defined globally in horse profile module
 
   // ── Save / load profile
   function saveProfile() {
     try {
-      localStorage.setItem(PROFILE_STORAGE_KEY, JSON.stringify(getProfile()));
+      localStorage.setItem(PROFILE_STORAGE_KEY, JSON.stringify(window.getProfile()));
     } catch (e) {}
   }
 
@@ -3230,7 +3023,7 @@ document.addEventListener('DOMContentLoaded', function () {
     const feedName = dropdown ? dropdown.value : '';
     if (feedName) params.set('feed', feedName);
 
-    const profile = getProfile();
+    const profile = window.getProfile();
     if (profile.use)       params.set('use', profile.use);
     if (profile.health && profile.health.length) params.set('health', profile.health.join(','));
     if (profile.condition) params.set('cond', profile.condition);
@@ -3291,7 +3084,7 @@ document.addEventListener('DOMContentLoaded', function () {
     if (!shareCardTitle || !shareCardBody) return;
     const dropdown = document.getElementById('libraryDropdown');
     const feedName = dropdown ? dropdown.value : 'Feed';
-    const profile  = getProfile();
+    const profile  = window.getProfile();
 
     const useLabels = {
       pleasure: 'trail/pleasure', performance: 'performance',
