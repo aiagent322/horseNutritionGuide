@@ -81,6 +81,25 @@
       <div class="decoder-card">
 
         <!-- Extracted text review -->
+        <!-- FEED LIBRARY SEARCH -->
+        <div class="library-search-wrap" id="librarySearchWrap">
+          <div class="library-search-header">
+            <span class="library-icon">&#128218;</span>
+            <strong>Know the feed name?</strong>
+            <span class="library-sub">Search our label library — instant decode, no camera needed</span>
+          </div>
+          <div class="library-search-row">
+            <input type="text" id="librarySearchInput" class="library-search-input"
+                   placeholder="e.g. Triple Crown Senior, SafeChoice, Strategy GX…"
+                   autocomplete="off" autocorrect="off" spellcheck="false" />
+            <button class="btn btn-library" id="librarySearchBtn">Find</button>
+          </div>
+          <div id="libraryResultMsg" class="library-result-msg" style="display:none;"></div>
+          <div id="librarySuggestions" class="library-suggestions" style="display:none;"></div>
+        </div>
+
+        <div class="library-or-divider"><span>— or paste / scan label text below —</span></div>
+
         <div class="decoder-input-area" id="textInputArea">
           <label for="feedInput" class="input-label">Label Text <span class="input-label-sub">— review &amp; edit if needed</span></label>
           <textarea id="feedInput" class="feed-textarea" placeholder="Label text will appear here after scanning. You can also type it in manually."></textarea>
