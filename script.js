@@ -749,10 +749,62 @@ function decodeLabel(text) {
     }
     if (analysis.selenium) {
       const seVal = analysis.selenium.value;
-      const seNote = seVal > 0.3
-        ? `Selenium listed at ${seVal} ppm — this is above the commonly cited NRC safe upper limit of 0.3 mg/kg in feed. This is not necessarily dangerous at normal feeding rates, but total daily selenium from all sources (feed + hay + supplements) should be reviewed with your vet. Selenium toxicity is a real risk.`
-        : `Selenium listed at ${seVal} ppm. Total daily selenium from all sources should stay below approximately 2 mg/day for most horses.`;
-      notes.push(seNote);
+
+      // ── Detect selenium source from ingredient list
+      const hasSelYeast     = /selenium\s*yeast/i.test(ingText || text);
+      const hasSodSelenite  = /sodium\s*selenite/i.test(ingText || text);
+      const hasSelProteinate= /selenium\s*proteinate/i.test(ingText || text);
+      const hasSelMethionine= /selenomethionine/i.test(ingText || text);
+
+      const isOrganic   = hasSelYeast || hasSelProteinate || hasSelMethionine;
+      const isInorganic = hasSodSelenite;
+      const isBoth      = isOrganic && isInorganic;
+
+      let seSource = '';
+      if (isBoth) {
+        seSource = `<div style="background:#FBF0DC;border:1px solid rgba(200,130,26,0.25);border-radius:6px;padding:8px 12px;margin-top:6px;font-size:0.85rem;">
+          <strong>Selenium source: Both organic and inorganic detected.</strong><br>
+          ${hasSelYeast ? 'Selenium yeast' : ''}${hasSelProteinate ? ', selenium proteinate' : ''}${hasSelMethionine ? ', selenomethionine' : ''} (organic) <em>and</em> sodium selenite (inorganic) are both present.
+          Using dual selenium sources is common in commercial feeds. Organic forms are more bioavailable.
+          Monitor total selenium intake from all sources (feed + hay + supplements).
+        </div>`;
+      } else if (isOrganic) {
+        const orgNames = [hasSelYeast ? 'selenium yeast' : '', hasSelProteinate ? 'selenium proteinate' : '', hasSelMethionine ? 'selenomethionine' : ''].filter(Boolean).join(', ');
+        seSource = `<div style="background:#E8F2ED;border:1px solid rgba(61,122,94,0.25);border-radius:6px;padding:8px 12px;margin-top:6px;font-size:0.85rem;color:#1C3A2F;">
+          <strong>Selenium source: Organic (${orgNames}).</strong><br>
+          Organic selenium is generally considered more bioavailable than inorganic sodium selenite — meaning the horse may absorb and utilize it more efficiently at the same listed ppm.
+          Still monitor total daily selenium from all sources.
+        </div>`;
+      } else if (isInorganic) {
+        seSource = `<div style="background:#F8F4EE;border:1px solid rgba(200,182,154,0.4);border-radius:6px;padding:8px 12px;margin-top:6px;font-size:0.85rem;color:#5C3A1A;">
+          <strong>Selenium source: Inorganic (sodium selenite).</strong><br>
+          Sodium selenite is the most common form in commercial horse feeds and is effective, but generally considered less bioavailable than organic forms like selenium yeast.
+          Some owners and nutritionists prefer organic selenium for horses with higher selenium needs or poor absorption.
+        </div>`;
+      } else if (hasIngList) {
+        seSource = `<div style="background:#F8F4EE;border:1px solid rgba(200,182,154,0.3);border-radius:6px;padding:8px 12px;margin-top:6px;font-size:0.85rem;color:#6B6B64;">
+          <em>Selenium source not identified in the ingredient list. Ask the manufacturer whether selenium is from sodium selenite (inorganic) or selenium yeast/proteinate (organic).</em>
+        </div>`;
+      }
+
+      // ── Selenium level note
+      const seLevelNote = seVal > 0.5
+        ? `Selenium listed at <strong>${seVal} ppm</strong> — notably above the commonly cited NRC safe upper limit of 0.3 mg/kg in feed. This is not necessarily dangerous at normal feeding rates, but total daily selenium from all sources (feed + hay + supplements) <strong>must</strong> be reviewed with your vet. Selenium toxicity is a real and serious risk.`
+        : seVal > 0.3
+        ? `Selenium listed at <strong>${seVal} ppm</strong> — above the commonly cited NRC safe upper limit of 0.3 mg/kg in feed. Total daily selenium from all sources (feed + hay + supplements) should be reviewed with your vet.`
+        : `Selenium listed at <strong>${seVal} ppm</strong> — within the commonly cited safe range for feed selenium. Total daily selenium from all sources should stay below approximately 2 mg/day for most horses.`;
+
+      notes.push(seLevelNote + seSource);
+    } else if (hasIngList) {
+      // Selenium not in analysis panel — check if it appears in ingredient list
+      const hasSelYeast     = /selenium\s*yeast/i.test(ingText);
+      const hasSodSelenite  = /sodium\s*selenite/i.test(ingText);
+      const hasSelProteinate= /selenium\s*proteinate/i.test(ingText);
+      if (hasSelYeast || hasSodSelenite || hasSelProteinate) {
+        const srcNames = [hasSelYeast ? 'selenium yeast' : '', hasSodSelenite ? 'sodium selenite' : '', hasSelProteinate ? 'selenium proteinate' : ''].filter(Boolean).join(', ');
+        const srcType  = (hasSelYeast || hasSelProteinate) && !hasSodSelenite ? 'organic' : hasSodSelenite && !hasSelYeast && !hasSelProteinate ? 'inorganic' : 'mixed organic/inorganic';
+        notes.push(`Selenium ingredient detected in the list (${srcNames} — ${srcType}) but no ppm value found in the guaranteed analysis. Ask the manufacturer for the selenium level in mg/kg or ppm.`);
+      }
     }
     if (/iron/i.test(text)) {
       const ironMatch = text.match(/iron[^0-9]*([0-9]+\.?[0-9]*)\s*ppm/i);
