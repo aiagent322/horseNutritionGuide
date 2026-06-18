@@ -771,21 +771,67 @@ function parseIngredientOrder(text) {
 }
 
 // Categorize a single ingredient string
+// ORDER MATTERS — more specific rules must come before broader ones
 function categorizeIngredient(ing) {
   const i = ing.toLowerCase();
-  if (/molasses|cane molasses|corn syrup|dextrose|sucrose/.test(i))         return 'sugar';
-  if (/corn|maize|wheat|barley|oat|grain|milo|sorghum|rye/.test(i) &&
-      !/oat hull|oat fiber/.test(i))                                          return 'starch';
-  if (/beet pulp|soybean hull|alfalfa|hay|oat hull|oat fiber/.test(i))      return 'fiber';
-  if (/soybean meal|canola meal|linseed meal|cottonseed meal/.test(i))       return 'protein';
-  if (/oil|fat|rice bran|flaxseed|linseed/.test(i))                         return 'fat';
-  if (/salt|sodium chloride/.test(i))                                         return 'salt';
-  if (/limestone|calcium carbonate|dicalcium|monocalcium|phosphate/.test(i)) return 'mineral';
-  if (/vitamin|supplement|niacin|biotin|riboflavin|thiamine|choline|folic|pyridoxine|pantothenate/.test(i)) return 'vitamin';
-  if (/lactobacillus|enterococcus|pediococcus|saccharomyces|yeast|fermentation/.test(i)) return 'probiotic';
-  if (/zinc|copper|manganese|selenium|iron|cobalt|iodine|magnesium/.test(i)) return 'trace-mineral';
-  if (/lysine|methionine|threonine|amino acid/.test(i))                       return 'amino-acid';
-  if (/flavor/.test(i))                                                        return 'flavoring';
+
+  // ── Sugar sources — check first before grain rules
+  if (/molasses|cane molasses|corn syrup|dextrose|sucrose/.test(i)) return 'sugar';
+
+  // ── Byproducts that LOOK like grains but are NOT starch-primary
+  // Must be checked before the broad grain/starch rule
+  if (/distiller|ddgs|dried grain solubles/.test(i))               return 'protein'; // high protein/fat byproduct
+  if (/wheat middling|wheat bran|wheat germ|wheat flour/.test(i))  return 'fiber';   // fiber/protein, low starch
+  if (/corn gluten|corn bran|hominy/.test(i))                       return 'protein'; // protein/fiber byproduct
+  if (/brewers grain|brewers dried grain/.test(i))                  return 'protein'; // fermentation byproduct
+  if (/brewers dried yeast|brewers yeast/.test(i))                  return 'probiotic';
+  if (/rice bran|rice hull|rice polish/.test(i))                    return 'fat';     // fat source not starch
+  if (/soybean hull|soy hull/.test(i))                              return 'fiber';
+  if (/cottonseed hull/.test(i))                                    return 'fiber';
+  if (/oat hull|oat fiber|oat straw/.test(i))                       return 'fiber';
+  if (/beet pulp/.test(i))                                          return 'fiber';
+  if (/alfalfa|dehydrated alfalfa|hay meal|timothy meal|grass meal/.test(i)) return 'fiber';
+  if (/hay/.test(i))                                                return 'fiber';
+
+  // ── Primary grain/starch sources — whole or minimally processed grains
+  // Only after all byproduct exceptions have been handled
+  if (/wheat/.test(i) && !/middling|bran|germ|flour/.test(i))           return 'starch';
+  if (/(corn|maize)/.test(i) && !/gluten|bran|hominy/.test(i))          return 'starch';
+  if (/oat/.test(i) && !/hull|fiber|straw/.test(i))                     return 'starch';
+  if (/barley/.test(i))                                                    return 'starch';
+  if (/milo|sorghum|rye/.test(i))                      return 'starch';
+  if (/cereal grain|grain product/.test(i))                         return 'starch';
+
+  // ── Protein meals
+  if (/soybean meal|canola meal|linseed meal|cottonseed meal|sunflower meal/.test(i)) return 'protein';
+
+  // ── Fat sources
+  if (/oil|vegetable fat|animal fat|tallow|flaxseed|linseed|stabilized fat/.test(i)) return 'fat';
+
+  // ── Minerals macro
+  if (/salt|sodium chloride/.test(i))                               return 'salt';
+  if (/limestone|calcium carbonate|dicalcium|monocalcium|phosphate|magnesium oxide|magnesium sulfate/.test(i)) return 'mineral';
+
+  // ── Vitamins and supplements
+  if (/vitamin|supplement|niacin|biotin|riboflavin|thiamine|choline|folic|pyridoxine|pantothenate|menadione|cyanocobalamin/.test(i)) return 'vitamin';
+
+  // ── Probiotics / digestive
+  if (/lactobacillus|enterococcus|pediococcus|bifidobacterium|saccharomyces|yeast culture|fermentation product/.test(i)) return 'probiotic';
+  if (/yeast/.test(i))                                              return 'probiotic';
+
+  // ── Trace minerals
+  if (/zinc|copper|manganese|selenium|ferrous|cobalt|iodine|ethylenediamine/.test(i)) return 'trace-mineral';
+  if (/iron/.test(i))                                           return 'trace-mineral';
+
+  // ── Amino acids
+  if (/lysine|methionine|threonine|tryptophan|amino acid/.test(i)) return 'amino-acid';
+
+  // ── Flavoring / palatability
+  if (/flavor|palatab/.test(i))                                     return 'flavoring';
+
+  // ── Mold inhibitors / preservatives
+  if (/propionic|propionate|mold inhibitor|preservative|antioxidant/.test(i)) return 'preservative';
+
   return 'other';
 }
 
