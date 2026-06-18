@@ -1419,3 +1419,27 @@ ul li { margin-bottom: 0.35rem; }
   margin-top: 8px;
   letter-spacing: 0.02em;
 }
+
+/* ── Introductory summary block */
+.intro-summary-block {
+  background: var(--green-pale);
+  border-left: 4px solid var(--green-mid);
+  border-radius: 0 var(--radius) var(--radius) 0;
+  padding: 18px 20px;
+  margin-bottom: 20px;
+  font-size: 0.97rem;
+  line-height: 1.75;
+  color: var(--text-dark);
+}
+
+.intro-summary-block strong {
+  color: var(--green-deep);
+}
+
+.intro-summary-block .intro-effect {
+  margin-top: 12px;
+  padding-top: 12px;
+  border-top: 1px solid rgba(61,122,94,0.15);
+  font-size: 0.92rem;
+  color: var(--text-mid);
+}

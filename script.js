@@ -1230,6 +1230,144 @@ function renderIngredientOrderHTML(flags) {
 // ─────────────────────────────────────────────
 // MAIN DECODE FUNCTION
 // ─────────────────────────────────────────────
+// ─────────────────────────────────────────────
+// INTRODUCTORY SUMMARY
+// First paragraph the consumer reads — narrative,
+// not a list. Tells them what this feed does to a horse.
+// ─────────────────────────────────────────────
+function buildIntroSummary(text, analysis, feedTypes, feedForm, fiberFound, grainFound, fatFound, proteinFound, sugarFound) {
+  const sentences = [];
+  const t = text || '';
+  const tl = t.toLowerCase();
+
+  // ── What kind of feed is this
+  const primaryType = feedTypes && feedTypes[0] ? feedTypes[0].label : 'horse feed';
+  const formDesc = feedForm ? feedForm.label.toLowerCase() : '';
+  const formNote = formDesc ? ` in ${formDesc} form` : '';
+
+  // ── Primary energy character — the most important thing
+  const fiberLead  = fiberFound && fiberFound.length >= 2 && (!grainFound || grainFound.length <= 1);
+  const grainLead  = grainFound && grainFound.length >= 2 && (!fiberFound || fiberFound.length <= 1);
+  const mixedEnergy = grainFound && fiberFound && grainFound.length >= 1 && fiberFound.length >= 1;
+
+  const hasMolasses = /molasses/i.test(t);
+  const hasBeetPulp = /beet pulp/i.test(t);
+  const hasAlfalfa  = /alfalfa/i.test(t);
+  const hasSoyHulls = /soybean hull/i.test(t);
+  const hasRiceBran = /rice bran/i.test(t);
+  const hasFlax     = /flax|linseed/i.test(t);
+  const hasCorn     = /corn/i.test(t);
+  const hasOats     = /oats/i.test(t);
+
+  // NSC
+  const nscM  = t.match(/nsc[^0-9]{0,20}(\d+\.?\d*)/i);
+  const stM   = t.match(/starch[^0-9]{0,20}(\d+\.?\d*)\s*%/i);
+  const suM   = t.match(/sugar[^0-9]{0,20}(\d+\.?\d*)\s*%/i);
+  const nscVal = nscM ? parseFloat(nscM[1]) :
+                 (stM && suM ? parseFloat(stM[1]) + parseFloat(suM[1]) : null);
+
+  const cpVal  = analysis && analysis.protein ? analysis.protein.value : null;
+  const fatVal = analysis && analysis.fat ? analysis.fat.value : null;
+  const seVal  = analysis && analysis.selenium ? analysis.selenium.value : null;
+  const vitEVal = analysis && analysis.vitE ? analysis.vitE.value : null;
+
+  // ── Opening sentence — what it IS
+  let opener = `This is a <strong>${primaryType}</strong>${formNote}.`;
+  if (feedForm && feedForm.primary === 'pelleted') {
+    opener += ' Pellets are a consistent, dust-free form that horses generally eat readily and that survives storage well.';
+  } else if (feedForm && feedForm.primary === 'textured') {
+    opener += ' The textured (sweet feed) form allows horses to sort ingredients, so monitor that your horse is consuming the whole ration.';
+  } else if (feedForm && feedForm.primary === 'extruded') {
+    opener += ' Extruded feeds are cooked under heat and pressure, which gelatinizes starch and improves digestibility.';
+  }
+  sentences.push(opener);
+
+  // ── What it does — energy story
+  if (fiberLead) {
+    const fiberNames = (fiberFound || []).slice(0, 2).join(' and ');
+    let fiberSentence = `The energy in this feed comes primarily from <strong>digestible fiber</strong>`;
+    if (fiberNames) fiberSentence += ` — specifically ${fiberNames}`;
+    fiberSentence += `. This means the horse's hindgut microbes do the work of fermenting the feed into usable energy, rather than a rapid glucose spike from grain digestion.`;
+    if (hasBeetPulp) fiberSentence += ' Beet pulp is one of the safest energy sources for horses with metabolic concerns — low glycemic impact, highly digestible, and gut-friendly.';
+    sentences.push(fiberSentence);
+  } else if (grainLead) {
+    const grainNames = (grainFound || []).slice(0, 2).join(' and ');
+    let grainSentence = `The primary energy source is <strong>grain starch</strong>`;
+    if (grainNames) grainSentence += ` (${grainNames})`;
+    grainSentence += `. Grain starch digests quickly in the small intestine and causes a blood glucose and insulin rise. For a horse in active work, this provides fast-burning fuel. For a horse with insulin resistance, EMS, Cushing's, PSSM, or laminitis history, grain-forward feeds require veterinary guidance before use.`;
+    sentences.push(grainSentence);
+  } else if (mixedEnergy) {
+    sentences.push(`This feed draws energy from both <strong>grain starch</strong> and <strong>digestible fiber</strong> — a common approach in performance feeds that balances quick-burning grain energy with slower, hindgut-fermented fiber calories. The fiber component buffers some of the starch's glycemic impact.`);
+  }
+
+  // ── Fat story if meaningful
+  if (fatVal !== null && fatVal >= 8) {
+    let fatSent = `With <strong>${fatVal}% crude fat</strong>, this is a high-fat formula.`;
+    if (hasRiceBran)  fatSent += ' Rice bran is a primary fat source — calorie-dense without adding starch.';
+    if (hasFlax)      fatSent += ' Flaxseed provides omega-3 fatty acids, which support coat quality and have anti-inflammatory effects.';
+    fatSent += ` Fat provides 2.25× more energy per gram than carbohydrates, making this feed calorie-efficient for hard keepers, performance horses, or horses that need extra condition without extra grain.`;
+    sentences.push(fatSent);
+  } else if (fatVal !== null && fatVal < 4) {
+    sentences.push(`Crude fat is <strong>${fatVal}%</strong> — low. Despite any performance marketing on the packaging, this is not a fat-based energy feed.`);
+  }
+
+  // ── Protein
+  if (cpVal !== null) {
+    const isSenior    = /senior/i.test(t);
+    const isBalancer  = /ration balancer/i.test(t);
+    const isGrowing   = /foal|growing|weanling|yearling/i.test(t);
+    let protSent = `Crude protein is <strong>${cpVal}%</strong>.`;
+    if (isBalancer) {
+      protSent += ` High crude protein % is expected in ration balancers — they're fed in small amounts (1–2 lbs/day), so actual daily protein delivery is moderate. This is a concentrated vitamin, mineral, and amino acid supplement, not a high-protein bulk feed.`;
+    } else if (isGrowing) {
+      protSent += cpVal >= 14 ? ` Appropriate for a growing horse, which needs more protein per pound of body weight than a mature horse.` : ` On the lower end for a growing horse — most nutritionists recommend 14–16% for foals and yearlings.`;
+    } else if (isSenior) {
+      protSent += cpVal >= 12 ? ` Good for a senior horse — older horses are less efficient at digesting and utilizing protein, so slightly higher crude protein helps maintain muscle mass.` : ` Below the 12–14% most equine nutritionists recommend for senior horses, who absorb protein less efficiently as they age.`;
+    } else {
+      protSent += cpVal > 16 ? ` High for a general purpose feed. Excess protein is excreted as ammonia, not stored as muscle. Fine for healthy horses with functional kidneys, but more than a mature horse at maintenance needs.` : cpVal >= 12 ? ` A moderate, appropriate level for a formulated concentrate.` : ` On the lower end for a concentrate — verify this meets your horse's needs given their workload.`;
+    }
+    sentences.push(protSent);
+  }
+
+  // ── NSC / metabolic impact sentence
+  if (nscVal !== null) {
+    const nscSource = nscM ? 'listed on the label' : 'calculated from the listed sugar and starch values';
+    let nscSent = `The NSC (non-structural carbohydrates — sugar + starch combined) is <strong>approximately ${nscVal}%</strong> (${nscSource}).`;
+    if (nscVal <= 10) {
+      nscSent += ` This is low-NSC — potentially suitable for horses with insulin resistance, EMS, laminitis, Cushing's, or PSSM, though always confirm with your vet.`;
+    } else if (nscVal <= 15) {
+      nscSent += ` This is moderate. Use caution with insulin-sensitive horses and verify this fits within their total daily NSC budget.`;
+    } else {
+      nscSent += ` This is elevated. This feed is not appropriate for horses with insulin resistance, EMS, laminitis history, Cushing's disease, or PSSM without explicit veterinary guidance.`;
+    }
+    sentences.push(nscSent);
+  } else if (hasMolasses && (grainLead || mixedEnergy)) {
+    sentences.push(`NSC is not listed on this label, but the combination of grain ingredients and molasses suggests a meaningful starch and sugar load. Ask the manufacturer for the tested NSC value before feeding to any horse with metabolic concerns.`);
+  }
+
+  // ── Selenium note if notable
+  if (seVal !== null && seVal > 0.3) {
+    sentences.push(`Selenium is <strong>${seVal} ppm</strong> — above the commonly cited 0.3 mg/kg safe upper limit for feed selenium. This is not necessarily dangerous at normal feeding rates, but total daily selenium from all sources (feed + hay + supplements) must be evaluated together.`);
+  }
+
+  // ── Effect on the horse — closing paragraph
+  const effects = [];
+  if (hasAlfalfa) effects.push("alfalfa's calcium and protein buffering the gastric environment");
+  if (hasBeetPulp || hasSoyHulls) effects.push('fermentable fiber supporting a stable hindgut microbiome');
+  if (hasRiceBran || hasFlax || (fatVal !== null && fatVal >= 8)) effects.push('fat sources promoting coat shine and sustained energy without starch spikes');
+  if (/yeast culture|lactobacillus|saccharomyces/i.test(t)) effects.push('digestive support ingredients to maintain hindgut health under stress or dietary change');
+  if (/biotin/i.test(t)) effects.push('biotin to support hoof horn synthesis over the coming months');
+  if (vitEVal !== null && vitEVal >= 200) effects.push(`${vitEVal} IU/lb of Vitamin E — important for muscle and immune health, especially for horses without daily pasture access`);
+
+  if (effects.length >= 2) {
+    sentences.push(`<div class="intro-effect">What this feed is designed to do for your horse: ${effects.slice(0,3).join('; ')}. The cards below break down each section in detail.</div>`);
+  } else {
+    sentences.push(`<div class="intro-effect">The detail cards below explain each ingredient category and guaranteed analysis value. Use the horse profile panel to get a personalized assessment for your specific horse.</div>`);
+  }
+
+  return sentences.join(' ');
+}
+
 function decodeLabel(text) {
 
   const hasIngList  = hasIngredientList(text);
@@ -2085,7 +2223,13 @@ function decodeLabel(text) {
     'you notice signs of selenium toxicity (hair loss, hoof separation, neurological symptoms)'
   ]);
 
+  const introHTML = buildIntroSummary(
+    text, analysis, feedTypes, feedForm,
+    fiberFound, grainFound, fatFound, proteinFound, sugarFound
+  );
+
   return {
+    intro:     introHTML,
     feedtype:  feedTypeHTML,
     energy:    energyHTML,
     protein:   proteinHTML,
@@ -2140,6 +2284,14 @@ function populateAnalysisGuide() {
 // DOM: RENDER DECODER OUTPUT
 // ─────────────────────────────────────────────
 function renderOutput(result) {
+  // Intro summary
+  const introEl = document.getElementById('oc-intro');
+  const introBlock = document.getElementById('introSummaryBlock');
+  if (introEl && result.intro) {
+    introEl.innerHTML = result.intro;
+    if (introBlock) introBlock.style.display = 'block';
+  }
+
   document.getElementById('oc-feedtype').innerHTML  = result.feedtype;
   document.getElementById('oc-energy').innerHTML    = result.energy;
   document.getElementById('oc-protein').innerHTML   = result.protein;
