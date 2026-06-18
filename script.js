@@ -643,28 +643,78 @@ function decodeLabel(text) {
       ? `${fatFound.map(f => pill(f)).join(' ')}<br><br>Fat-based ingredients provide concentrated energy without raising starch or sugar levels. Flaxseed and fish oil also contribute omega-3 fatty acids.`
       : 'No fat-specific ingredients detected.';
 
-  // ── Sugar/Starch Cautions
+  // ── Sugar/Starch / NSC
   const nscVal    = analysis.nsc    ? analysis.nsc.value    : null;
   const sugarVal  = analysis.sugar  ? analysis.sugar.value  : null;
   const starchVal = analysis.starch ? analysis.starch.value : null;
 
+  // ── NSC helper: render a value with color-coded risk language
+  function nscRiskNote(val, source) {
+    const risk = val <= 10
+      ? { label: 'Low', color: '#1C3A2F', bg: '#E8F2ED', note: 'Generally considered safe for most horses including those with insulin resistance or laminitis history. Always verify with your vet.' }
+      : val <= 15
+      ? { label: 'Moderate-Low', color: '#5C3A1A', bg: '#FBF0DC', note: 'May be appropriate for horses in light to moderate work without metabolic concerns. Use caution with insulin-resistant or laminitis-risk horses.' }
+      : val <= 20
+      ? { label: 'Moderate', color: '#8B4A00', bg: '#FDF3EE', note: 'Not recommended for horses with insulin resistance, EMS, PPID/Cushing\'s, or laminitis history without veterinary guidance.' }
+      : { label: 'High', color: '#8B2E00', bg: '#FDF0EE', note: 'This level of NSC is not appropriate for horses with metabolic conditions. Consult your vet before feeding.' };
+    return `<div style="background:${risk.bg};border-radius:6px;padding:10px 13px;margin:6px 0;font-size:0.88rem;">
+      <strong style="color:${risk.color}">NSC ${source}: ~${val}% — ${risk.label}</strong><br>
+      <span style="color:#5C3A1A">${risk.note}</span>
+    </div>`;
+  }
+
   const sugarWarnings = [];
+
+  // ── Sugar ingredient signals from ingredient list
   if (hasIngList && sugarFound.length) {
     sugarWarnings.push(`Sugar/palatability ingredients detected: ${sugarFound.map(s => pill(s, true)).join(' ')}`);
   }
+
+  // ── NSC: listed directly
   if (nscVal !== null) {
-    const nscNote = nscVal <= 12
-      ? `NSC appears to be ${nscVal}% — relatively low, which may be appropriate for insulin-resistant or laminitis-risk horses. Always verify with your vet.`
-      : nscVal <= 20
-      ? `NSC appears to be ${nscVal}% — moderate range. May not be suitable for horses with insulin resistance, PPID, or laminitis history without veterinary guidance.`
-      : `NSC appears to be ${nscVal}% — higher carbohydrate feed. Not typically recommended for horses with insulin resistance, EMS, PPID, or laminitis risk.`;
-    sugarWarnings.push(nscNote);
+    sugarWarnings.push(nscRiskNote(nscVal, '(listed on label)'));
+    if (sugarVal !== null) sugarWarnings.push(`Sugar: ${sugarVal}% (max) as listed.`);
+    if (starchVal !== null) sugarWarnings.push(`Starch: ${starchVal}% (max) as listed.`);
+
+  // ── NSC: calculate from sugar + starch if both listed
+  } else if (sugarVal !== null && starchVal !== null) {
+    const calcNSC = Math.round((sugarVal + starchVal) * 10) / 10;
+    sugarWarnings.push(`<strong>NSC not listed — calculated from label values:</strong> Sugar (${sugarVal}%) + Starch (${starchVal}%) = <strong>~${calcNSC}% NSC</strong>`);
+    sugarWarnings.push(nscRiskNote(calcNSC, '(calculated: sugar + starch)'));
+    sugarWarnings.push(`<em style="font-size:0.82rem;color:#888">Note: Calculated NSC may differ slightly from a laboratory-tested value. Some feeds test lower due to processing. Ask the manufacturer for the actual tested NSC value to confirm.</em>`);
+
+  // ── NSC: only sugar listed
+  } else if (sugarVal !== null && starchVal === null) {
+    sugarWarnings.push(`Sugar listed at ${sugarVal}% (max). Starch value not found — NSC cannot be calculated. Ask the manufacturer for the starch and NSC values.`);
+    sugarWarnings.push(`<em style="font-size:0.82rem;color:#888">For metabolic horses, the target is typically total NSC below 10–12%. Sugar alone does not give the full picture.</em>`);
+
+  // ── NSC: only starch listed
+  } else if (starchVal !== null && sugarVal === null) {
+    sugarWarnings.push(`Starch listed at ${starchVal}% (max). Sugar (WSC) value not found — NSC cannot be calculated. Ask the manufacturer for the sugar and NSC values.`);
+
+  // ── NSC: nothing listed — use ingredient order signals to give qualitative estimate
+  } else {
+    const ingFlags = hasIngList ? ingredientOrderFlags : [];
+    const hasGrainLead  = ingFlags.some(f => f.level === 'caution' && f.text.includes('starch'));
+    const hasFiberLead  = ingFlags.some(f => f.level === 'positive');
+    const hasSugarIngredient = hasIngList && sugarFound.length > 0;
+
+    if (hasGrainLead && hasSugarIngredient) {
+      sugarWarnings.push(`<div style="background:#FDF3EE;border:1px solid rgba(139,46,0,0.2);border-radius:6px;padding:10px 13px;font-size:0.88rem;color:#8B2E00;">
+        <strong>⚠ NSC not listed — ingredient signals suggest this may be a higher-NSC feed.</strong><br>
+        Grain ingredients lead the list and sugar ingredients are present. For horses with metabolic conditions, ask the manufacturer for tested NSC, sugar, and starch values before feeding.
+      </div>`);
+    } else if (hasFiberLead && !hasSugarIngredient) {
+      sugarWarnings.push(`<div style="background:#E8F2ED;border:1px solid rgba(61,122,94,0.25);border-radius:6px;padding:10px 13px;font-size:0.88rem;color:#1C3A2F;">
+        <strong>NSC not listed — ingredient signals suggest this may be a lower-NSC feed.</strong><br>
+        Fiber sources lead the ingredient list and no sugar ingredients were detected. However, NSC should always be confirmed with the manufacturer for horses with insulin resistance, EMS, laminitis, or PPID/Cushing\'s.
+      </div>`);
+    } else {
+      sugarWarnings.push(`NSC, sugar, and starch values not detected on this label. Ask the manufacturer directly — these numbers are critical for horses with metabolic conditions, insulin resistance, laminitis, or PPID/Cushing\'s.`);
+      sugarWarnings.push(`<em style="font-size:0.82rem;color:#888">Ask: "What is the tested NSC value for this feed?" and "Can you provide the sugar (WSC) and starch values separately?"</em>`);
+    }
   }
-  if (sugarVal !== null) sugarWarnings.push(`Sugar listed at approximately ${sugarVal}% (max).`);
-  if (starchVal !== null) sugarWarnings.push(`Starch listed at approximately ${starchVal}% (max).`);
-  if (!sugarWarnings.length) {
-    sugarWarnings.push('No NSC, sugar, or starch values detected. Ask the manufacturer for these — especially important for horses with metabolic conditions, insulin resistance, laminitis, or PPID/Cushing\'s.');
-  }
+
   const sugarHTML = sugarWarnings.join('<br><br>');
 
   // ── Vitamins & Minerals — expanded detection
