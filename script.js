@@ -1351,6 +1351,28 @@ function decodeLabel(text) {
     if (allMinerals.length) vparts.push(`Minerals detected: ${allMinerals.map(m => pill(m)).join(' ')}`);
 
     const notes = [];
+    // ── Vitamin A evaluation
+    if (analysis.vitA) {
+      const vitAVal = analysis.vitA.value;
+      const vitANote = vitAVal > 15000
+        ? `Vitamin A listed at <strong>${vitAVal.toLocaleString()} IU/lb</strong> — high level. Vitamin A toxicity is a real concern when horses receive high amounts from multiple sources (feed + hay + supplements). Symptoms include bone fragility, skin problems, and reproductive issues. If feeding multiple fortified feeds or supplements, total Vitamin A from all sources should be reviewed.`
+        : vitAVal >= 5000
+        ? `Vitamin A listed at <strong>${vitAVal.toLocaleString()} IU/lb</strong> — a typical fortification level for commercial feeds. Horses on green pasture or high-quality hay have additional Vitamin A from beta-carotene. Avoid stacking multiple Vitamin A-fortified products.`
+        : `Vitamin A listed at <strong>${vitAVal.toLocaleString()} IU/lb</strong> — lower fortification level. Horses without access to green forage may need additional Vitamin A.`;
+      notes.push(vitANote);
+    }
+
+    // ── Vitamin D evaluation
+    if (analysis.vitD) {
+      const vitDVal = analysis.vitD.value;
+      const vitDNote = vitDVal > 3000
+        ? `Vitamin D listed at <strong>${vitDVal.toLocaleString()} IU/lb</strong> — elevated level. Vitamin D is the most toxic of the fat-soluble vitamins when oversupplemented. It causes calcium to be deposited in soft tissues (calcification of arteries, lungs, kidneys). Horses that spend time outdoors synthesize Vitamin D from sunlight — if your horse has significant outdoor access, total Vitamin D from all sources should be reviewed with your vet.`
+        : vitDVal >= 500
+        ? `Vitamin D listed at <strong>${vitDVal.toLocaleString()} IU/lb</strong> — a standard fortification level. Horses with regular outdoor access synthesize Vitamin D from sunlight, so supplementation from feed alone at this level is generally not a concern.`
+        : `Vitamin D listed at <strong>${vitDVal.toLocaleString()} IU/lb</strong> — low fortification. Horses kept primarily indoors or in limited sunlight may need additional Vitamin D.`;
+      notes.push(vitDNote);
+    }
+
     if (analysis.vitE) {
       const vitEVal = analysis.vitE.value;
 
