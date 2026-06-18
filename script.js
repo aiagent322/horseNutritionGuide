@@ -2905,3 +2905,433 @@ document.addEventListener('DOMContentLoaded', function () {
   });
 
 })();
+
+// ─────────────────────────────────────────────
+// LIBRARY DROPDOWN + RATION BUILDER + SHARE
+// ─────────────────────────────────────────────
+(function () {
+  'use strict';
+
+  const PROFILE_STORAGE_KEY = 'hng_horse_profile';
+  const MAX_RATION_SLOTS = 4;
+
+  // ── Ration state
+  let rationFeeds = [{ name: '', labelText: '', lbsPerDay: 0 }];
+
+  // ── DOM refs
+  let dropdown, loadBtn, statusMsg, rationWrap, rationSlots, rationAddBtn,
+      rationAnalyzeBtn, rationOutput, feedInput, decodeBtn,
+      shareBlock, shareLinkBtn, shareCardBtn, shareLinkMsg, shareCard,
+      shareCardTitle, shareCardBody, profileSaveOpt, profileSaveCheck;
+
+  document.addEventListener('DOMContentLoaded', function () {
+    dropdown         = document.getElementById('libraryDropdown');
+    loadBtn          = document.getElementById('libraryLoadBtn');
+    statusMsg        = document.getElementById('libraryStatusMsg');
+    rationWrap       = document.getElementById('rationBuilderWrap');
+    rationSlotsEl    = document.getElementById('rationSlots');
+    rationAddBtn     = document.getElementById('rationAddBtn');
+    rationAnalyzeBtn = document.getElementById('rationAnalyzeBtn');
+    rationOutput     = document.getElementById('rationOutput');
+    feedInput        = document.getElementById('feedInput');
+    decodeBtn        = document.getElementById('decodeBtn');
+    shareBlock       = document.getElementById('shareBlock');
+    shareLinkBtn     = document.getElementById('shareLinkBtn');
+    shareCardBtn     = document.getElementById('shareCardBtn');
+    shareLinkMsg     = document.getElementById('shareLinkMsg');
+    shareCard        = document.getElementById('shareCard');
+    shareCardTitle   = document.getElementById('shareCardTitle');
+    shareCardBody    = document.getElementById('shareCardBody');
+    profileSaveOpt   = document.getElementById('profileSaveOpt');
+    profileSaveCheck = document.getElementById('profileSaveCheck');
+
+    // ── Populate dropdown
+    if (dropdown && typeof FEED_LABEL_LIBRARY !== 'undefined') {
+      const names = Object.keys(FEED_LABEL_LIBRARY).sort();
+      // Group by brand
+      const brands = {};
+      names.forEach(function (n) {
+        const brand = n.split(' ')[0] === 'Triple' ? 'Triple Crown' :
+                      n.split(' ')[0] === 'Nutrena' ? 'Nutrena' :
+                      n.split(' ')[0] === 'Purina' ? 'Purina' :
+                      n.split(' ')[0] === 'Standlee' ? 'Standlee' :
+                      n.split(' ')[0] === 'Buckeye' ? 'Buckeye' :
+                      n.split(' ')[0] === 'Seminole' ? 'Seminole' :
+                      n.split(' ')[0] === 'Tribute' ? 'Tribute' : 'Other';
+        if (!brands[brand]) brands[brand] = [];
+        brands[brand].push(n);
+      });
+      Object.keys(brands).sort().forEach(function (brand) {
+        const og = document.createElement('optgroup');
+        og.label = brand;
+        brands[brand].forEach(function (name) {
+          const opt = document.createElement('option');
+          opt.value = name;
+          opt.textContent = name;
+          og.appendChild(opt);
+        });
+        dropdown.appendChild(og);
+      });
+    }
+
+    // ── Load button
+    if (loadBtn) {
+      loadBtn.addEventListener('click', function () {
+        const name = dropdown ? dropdown.value : '';
+        if (!name) return;
+        loadFeedFromLibrary(name, true);
+      });
+    }
+
+    // ── Dropdown change — auto-show ration builder option
+    if (dropdown) {
+      dropdown.addEventListener('change', function () {
+        if (dropdown.value && rationWrap) {
+          rationWrap.style.display = 'block';
+          updateRationSlot(0, dropdown.value);
+          refreshRationUI();
+        }
+      });
+    }
+
+    // ── Ration Builder: add slot
+    if (rationAddBtn) {
+      rationAddBtn.addEventListener('click', function () {
+        if (rationFeeds.length >= MAX_RATION_SLOTS) return;
+        rationFeeds.push({ name: '', labelText: '', lbsPerDay: 0 });
+        refreshRationUI();
+      });
+    }
+
+    // ── Ration analyze
+    if (rationAnalyzeBtn) {
+      rationAnalyzeBtn.addEventListener('click', function () {
+        const profile = getProfile();
+        const result  = window.analyzeRation(rationFeeds, profile);
+        if (result && rationOutput) {
+          rationOutput.innerHTML = window.renderRationAnalysis(result);
+          rationOutput.style.display = 'block';
+          rationOutput.scrollIntoView({ behavior: 'smooth', block: 'start' });
+        }
+      });
+    }
+
+    // ── Profile save opt-in — show after first selection
+    document.querySelectorAll('.profile-btn').forEach(function (btn) {
+      btn.addEventListener('click', function () {
+        if (profileSaveOpt) profileSaveOpt.style.display = 'flex';
+      }, { once: true });
+    });
+
+    // ── Load saved profile
+    loadSavedProfile();
+
+    // ── Save profile on decode
+    if (decodeBtn) {
+      decodeBtn.addEventListener('click', function () {
+        if (profileSaveCheck && profileSaveCheck.checked) saveProfile();
+        // Show share block after decode
+        setTimeout(function () {
+          const output = document.getElementById('decoderOutput');
+          if (output && output.style.display !== 'none') {
+            if (shareBlock) shareBlock.style.display = 'block';
+          }
+        }, 800);
+      }, true);
+    }
+
+    // ── Share: copy link
+    if (shareLinkBtn) {
+      shareLinkBtn.addEventListener('click', function () {
+        const url = buildShareURL();
+        if (navigator.clipboard) {
+          navigator.clipboard.writeText(url).then(function () {
+            showShareMsg('Link copied! Share it via text or email.');
+          });
+        } else {
+          showShareMsg(url);
+        }
+      });
+    }
+
+    // ── Share: screenshot card
+    if (shareCardBtn) {
+      shareCardBtn.addEventListener('click', function () {
+        buildShareCard();
+        if (shareCard) {
+          shareCard.style.display = 'block';
+          shareCard.scrollIntoView({ behavior: 'smooth', block: 'start' });
+          showShareMsg('Screenshot card shown below — take a screenshot to share.');
+        }
+      });
+    }
+
+    // ── Check for shared URL on load
+    loadFromShareURL();
+
+    // ── Render initial ration slot
+    refreshRationUI();
+  });
+
+  // ── Load feed from library into textarea
+  function loadFeedFromLibrary(name, autoDecode) {
+    if (typeof FEED_LABEL_LIBRARY === 'undefined' || !FEED_LABEL_LIBRARY[name]) return;
+    const text = FEED_LABEL_LIBRARY[name];
+    if (feedInput) feedInput.value = text;
+    if (statusMsg) {
+      statusMsg.textContent = '✓ ' + name + ' loaded — scroll down to decode.';
+      statusMsg.style.display = 'block';
+    }
+    updateRationSlot(0, name);
+    if (autoDecode) {
+      setTimeout(function () {
+        const profile = document.getElementById('horseProfile');
+        if (profile) profile.scrollIntoView({ behavior: 'smooth', block: 'start' });
+        setTimeout(function () { if (decodeBtn) decodeBtn.click(); }, 600);
+      }, 200);
+    }
+  }
+
+  // ── Ration slot management
+  function updateRationSlot(idx, name) {
+    if (!rationFeeds[idx]) return;
+    rationFeeds[idx].name = name;
+    rationFeeds[idx].labelText = (typeof FEED_LABEL_LIBRARY !== 'undefined' && FEED_LABEL_LIBRARY[name]) ? FEED_LABEL_LIBRARY[name] : '';
+  }
+
+  function refreshRationUI() {
+    if (!rationSlotsEl) return;
+    rationSlotsEl.innerHTML = '';
+
+    rationFeeds.forEach(function (feed, idx) {
+      const slot = document.createElement('div');
+      slot.className = 'ration-slot';
+
+      const numEl = document.createElement('div');
+      numEl.className = 'ration-slot-num';
+      numEl.textContent = 'Feed ' + (idx + 1);
+
+      const sel = document.createElement('select');
+      sel.className = 'ration-slot-select';
+      sel.innerHTML = '<option value="">— Select feed —</option>';
+      if (typeof FEED_LABEL_LIBRARY !== 'undefined') {
+        Object.keys(FEED_LABEL_LIBRARY).sort().forEach(function (n) {
+          const opt = document.createElement('option');
+          opt.value = n;
+          opt.textContent = n;
+          if (n === feed.name) opt.selected = true;
+          sel.appendChild(opt);
+        });
+      }
+      sel.addEventListener('change', function () {
+        updateRationSlot(idx, sel.value);
+        // First slot also loads main textarea
+        if (idx === 0 && sel.value) loadFeedFromLibrary(sel.value, false);
+        checkRationAnalyzeBtn();
+      });
+
+      const lbsInput = document.createElement('input');
+      lbsInput.type = 'number';
+      lbsInput.className = 'ration-slot-lbs';
+      lbsInput.placeholder = 'lbs';
+      lbsInput.min = '0';
+      lbsInput.step = '0.5';
+      lbsInput.value = feed.lbsPerDay || '';
+      lbsInput.addEventListener('change', function () {
+        rationFeeds[idx].lbsPerDay = parseFloat(lbsInput.value) || 0;
+        checkRationAnalyzeBtn();
+      });
+
+      const lbsLabel = document.createElement('span');
+      lbsLabel.className = 'ration-slot-label';
+      lbsLabel.textContent = 'lbs/day';
+
+      slot.appendChild(numEl);
+      slot.appendChild(sel);
+      slot.appendChild(lbsInput);
+      slot.appendChild(lbsLabel);
+
+      // Remove button (not for first slot)
+      if (idx > 0) {
+        const rmBtn = document.createElement('button');
+        rmBtn.className = 'ration-slot-remove';
+        rmBtn.innerHTML = '&#10005;';
+        rmBtn.addEventListener('click', function () {
+          rationFeeds.splice(idx, 1);
+          refreshRationUI();
+        });
+        slot.appendChild(rmBtn);
+      }
+
+      rationSlotsEl.appendChild(slot);
+    });
+
+    // Add button visibility
+    if (rationAddBtn) {
+      rationAddBtn.style.display = rationFeeds.length >= MAX_RATION_SLOTS ? 'none' : 'block';
+    }
+
+    checkRationAnalyzeBtn();
+  }
+
+  function checkRationAnalyzeBtn() {
+    if (!rationAnalyzeBtn) return;
+    const hasTwo = rationFeeds.filter(function (f) {
+      return f.name && f.lbsPerDay > 0;
+    }).length >= 2;
+    rationAnalyzeBtn.style.display = hasTwo ? 'block' : 'none';
+  }
+
+  // ── Horse profile: get current selections
+  function getProfile() {
+    const profile = {};
+    document.querySelectorAll('.profile-options[data-group]').forEach(function (group) {
+      const key     = group.getAttribute('data-group');
+      const isMulti = group.getAttribute('data-multi') === 'true';
+      const sel     = Array.from(group.querySelectorAll('.profile-btn.selected, .profile-btn.selected-caution'))
+                          .map(function (b) { return b.getAttribute('data-value'); });
+      profile[key] = isMulti ? sel : (sel[0] || null);
+    });
+    return profile;
+  }
+
+  // ── Save / load profile
+  function saveProfile() {
+    try {
+      localStorage.setItem(PROFILE_STORAGE_KEY, JSON.stringify(getProfile()));
+    } catch (e) {}
+  }
+
+  function loadSavedProfile() {
+    try {
+      const saved = localStorage.getItem(PROFILE_STORAGE_KEY);
+      if (!saved) return;
+      const profile = JSON.parse(saved);
+      Object.keys(profile).forEach(function (key) {
+        const vals = Array.isArray(profile[key]) ? profile[key] : [profile[key]];
+        vals.forEach(function (val) {
+          const btn = document.querySelector('.profile-options[data-group="' + key + '"] [data-value="' + val + '"]');
+          if (btn) {
+            const isMulti = btn.closest('[data-multi]');
+            btn.classList.add(isMulti ? 'selected-caution' : 'selected');
+          }
+        });
+      });
+      if (profileSaveCheck) profileSaveCheck.checked = true;
+      if (profileSaveOpt) profileSaveOpt.style.display = 'flex';
+    } catch (e) {}
+  }
+
+  // ── Share URL — encode feed name + profile into URL params
+  function buildShareURL() {
+    const base = window.location.origin + window.location.pathname;
+    const params = new URLSearchParams();
+    const dropdown = document.getElementById('libraryDropdown');
+    const feedName = dropdown ? dropdown.value : '';
+    if (feedName) params.set('feed', feedName);
+
+    const profile = getProfile();
+    if (profile.use)       params.set('use', profile.use);
+    if (profile.health && profile.health.length) params.set('health', profile.health.join(','));
+    if (profile.condition) params.set('cond', profile.condition);
+    if (profile.forage)    params.set('forage', profile.forage);
+
+    // Include key GA numbers in URL for sharing without needing to decode again
+    const text = feedInput ? feedInput.value : '';
+    if (text && window.parseGAFromText) {
+      const ga = window.parseGAFromText(text);
+      if (ga.protein)  params.set('cp', ga.protein);
+      if (ga.fat)      params.set('fat', ga.fat);
+      if (ga.nsc || (ga.starch && ga.sugar)) params.set('nsc', ga.nsc || (ga.starch + ga.sugar));
+    }
+
+    return base + '?' + params.toString();
+  }
+
+  function loadFromShareURL() {
+    try {
+      const params = new URLSearchParams(window.location.search);
+      const feedName = params.get('feed');
+      if (feedName && typeof FEED_LABEL_LIBRARY !== 'undefined' && FEED_LABEL_LIBRARY[feedName]) {
+        setTimeout(function () {
+          if (dropdown) dropdown.value = feedName;
+          loadFeedFromLibrary(feedName, false);
+
+          // Restore profile
+          const use = params.get('use');
+          if (use) {
+            const btn = document.querySelector('.profile-options[data-group="use"] [data-value="' + use + '"]');
+            if (btn) btn.classList.add('selected');
+          }
+          const health = params.get('health');
+          if (health) {
+            health.split(',').forEach(function (val) {
+              const btn = document.querySelector('.profile-options[data-group="health"] [data-value="' + val + '"]');
+              if (btn) btn.classList.add('selected-caution');
+            });
+          }
+          ['condition:cond','forage:forage'].forEach(function (pair) {
+            const [grp, param] = pair.split(':');
+            const val = params.get(param);
+            if (val) {
+              const btn = document.querySelector('.profile-options[data-group="' + grp + '"] [data-value="' + val + '"]');
+              if (btn) btn.classList.add('selected');
+            }
+          });
+
+          // Auto-decode
+          setTimeout(function () { if (decodeBtn) decodeBtn.click(); }, 500);
+        }, 300);
+      }
+    } catch (e) {}
+  }
+
+  // ── Share card content
+  function buildShareCard() {
+    if (!shareCardTitle || !shareCardBody) return;
+    const dropdown = document.getElementById('libraryDropdown');
+    const feedName = dropdown ? dropdown.value : 'Feed';
+    const profile  = getProfile();
+
+    const useLabels = {
+      pleasure: 'trail/pleasure', performance: 'performance',
+      senior: 'senior', breeding: 'breeding', growing: 'growing', idle: 'retired'
+    };
+
+    const title = feedName || 'My Feed Breakdown';
+    shareCardTitle.textContent = title;
+
+    // Pull key numbers from visible output
+    const analysisEl = document.getElementById('oc-analysis');
+    const summaryEl  = document.getElementById('oc-summary');
+
+    let body = '';
+    if (profile.use) body += '🐴 Horse: ' + (useLabels[profile.use] || profile.use) + '\n';
+    if (analysisEl) {
+      const txt = analysisEl.innerText || '';
+      const cpM   = txt.match(/Crude Protein[^\d]*(\d+\.?\d*)/i);
+      const fatM  = txt.match(/Crude Fat[^\d]*(\d+\.?\d*)/i);
+      const nscM  = txt.match(/NSC[^\d]*(\d+\.?\d*)/i);
+      const seM   = txt.match(/Selenium[^\d]*(\d+\.?\d*)/i);
+      if (cpM)  body += '📊 Crude Protein: ' + cpM[1] + '%\n';
+      if (fatM) body += '📊 Crude Fat: ' + fatM[1] + '%\n';
+      if (nscM) body += '📊 NSC: ' + nscM[1] + '%\n';
+      if (seM)  body += '📊 Selenium: ' + seM[1] + ' ppm\n';
+    }
+
+    if (summaryEl) {
+      const summary = (summaryEl.innerText || '').substring(0, 280);
+      if (summary) body += '\n' + summary + (summary.length >= 280 ? '…' : '');
+    }
+
+    shareCardBody.innerHTML = body.replace(/\n/g, '<br>');
+  }
+
+  function showShareMsg(msg) {
+    if (shareLinkMsg) {
+      shareLinkMsg.textContent = msg;
+      shareLinkMsg.style.display = 'block';
+    }
+  }
+
+})();

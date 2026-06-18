@@ -80,65 +80,80 @@
 
       <div class="decoder-card">
 
-        <!-- Extracted text review -->
-        <!-- FEED LIBRARY SEARCH -->
-        <div class="library-search-wrap" id="librarySearchWrap">
-          <div class="library-search-header">
+        <!-- ═══ FEED LIBRARY DROPDOWN ═══ -->
+        <div class="library-panel" id="libraryPanel">
+          <div class="library-panel-header">
             <span class="library-icon">&#128218;</span>
-            <strong>Know the feed name?</strong>
-            <span class="library-sub">Search our label library — instant decode, no camera needed</span>
+            <div>
+              <strong>Select from our label library</strong>
+              <span class="library-sub">22 verified feeds — instant decode, zero cost</span>
+            </div>
           </div>
-          <div class="library-search-row">
-            <input type="text" id="librarySearchInput" class="library-search-input"
-                   placeholder="e.g. Triple Crown Senior, SafeChoice, Strategy GX…"
-                   autocomplete="off" autocorrect="off" spellcheck="false" />
-            <button class="btn btn-library" id="librarySearchBtn">Find</button>
+          <div class="library-dropdown-row">
+            <select id="libraryDropdown" class="library-dropdown">
+              <option value="">— Choose a feed —</option>
+            </select>
+            <button class="btn btn-library" id="libraryLoadBtn">Load</button>
           </div>
-          <div id="libraryResultMsg" class="library-result-msg" style="display:none;"></div>
-          <div id="librarySuggestions" class="library-suggestions" style="display:none;"></div>
+          <div id="libraryStatusMsg" class="library-status-msg" style="display:none;"></div>
+
+          <!-- ── RATION BUILDER: add up to 4 feeds -->
+          <div class="ration-builder-wrap" id="rationBuilderWrap" style="display:none;">
+            <div class="ration-builder-header">
+              <span>&#9864;</span>
+              <strong>Ration Builder</strong>
+              <span class="ration-builder-sub">Combine up to 4 feeds and see if they work together</span>
+            </div>
+            <div id="rationSlots"></div>
+            <button class="btn btn-ration-add" id="rationAddBtn">+ Add another feed</button>
+            <button class="btn btn-ration-analyze" id="rationAnalyzeBtn" style="display:none;">Analyze This Ration</button>
+            <div id="rationOutput" style="display:none;"></div>
+          </div>
+
+          <div class="library-or-divider"><span>— or scan / paste label text below —</span></div>
         </div>
 
-        <div class="library-or-divider"><span>— or paste / scan label text below —</span></div>
-
+        <!-- ═══ LABEL TEXT INPUT ═══ -->
         <div class="decoder-input-area" id="textInputArea">
-          <label for="feedInput" class="input-label">Label Text <span class="input-label-sub">— review &amp; edit if needed</span></label>
-          <textarea id="feedInput" class="feed-textarea" placeholder="Label text will appear here after scanning. You can also type it in manually."></textarea>
-          <!-- HORSE PROFILE -->
+          <label for="feedInput" class="input-label">Label Text <span class="input-label-sub">— paste, scan, or loaded from library</span></label>
+          <textarea id="feedInput" class="feed-textarea" placeholder="Label text will appear here after scanning, or select a feed above."></textarea>
+
+          <!-- ═══ HORSE PROFILE ═══ -->
           <div class="horse-profile" id="horseProfile">
             <div class="profile-header">
               <span class="profile-icon">&#128014;</span>
               <strong>Tell us about your horse</strong>
-              <span class="profile-sub">— so the summary speaks directly to your situation</span>
+              <span class="profile-sub">— personalizes your summary</span>
+              <label class="profile-save-opt" id="profileSaveOpt" style="display:none;">
+                <input type="checkbox" id="profileSaveCheck" /> Remember my horse
+              </label>
             </div>
 
             <div class="profile-grid">
-
               <div class="profile-group">
                 <div class="profile-label">Primary use</div>
                 <div class="profile-options" data-group="use">
                   <button class="profile-btn" data-value="pleasure">Trail / Pleasure</button>
                   <button class="profile-btn" data-value="performance">Performance / Sport</button>
-                  <button class="profile-btn" data-value="senior">Senior (15+ years)</button>
+                  <button class="profile-btn" data-value="senior">Senior (15+ yrs)</button>
                   <button class="profile-btn" data-value="breeding">Breeding / Pregnant</button>
                   <button class="profile-btn" data-value="growing">Growing / Young</button>
                   <button class="profile-btn" data-value="idle">Idle / Retired</button>
                 </div>
               </div>
-
               <div class="profile-group">
                 <div class="profile-label">Health concerns <span class="profile-multi">(select all that apply)</span></div>
                 <div class="profile-options" data-group="health" data-multi="true">
                   <button class="profile-btn" data-value="none">None known</button>
                   <button class="profile-btn" data-value="ir">Insulin resistance / EMS</button>
-                  <button class="profile-btn" data-value="laminitis">Laminitis / Founder history</button>
+                  <button class="profile-btn" data-value="laminitis">Laminitis / Founder</button>
                   <button class="profile-btn" data-value="cushings">Cushing's / PPID</button>
                   <button class="profile-btn" data-value="pssm">PSSM / Tying-up</button>
-                  <button class="profile-btn" data-value="ulcers">Ulcers / Digestive issues</button>
+                  <button class="profile-btn" data-value="ulcers">Ulcers / Digestive</button>
                   <button class="profile-btn" data-value="hoof">Hoof quality issues</button>
-                  <button class="profile-btn" data-value="weight_loss">Hard keeper / Underweight</button>
+                  <button class="profile-btn" data-value="weight_loss">Hard keeper / Thin</button>
                 </div>
               </div>
-
               <div class="profile-group">
                 <div class="profile-label">Body condition</div>
                 <div class="profile-options" data-group="condition">
@@ -147,7 +162,6 @@
                   <button class="profile-btn" data-value="overweight">Overweight / Easy keeper</button>
                 </div>
               </div>
-
               <div class="profile-group">
                 <div class="profile-label">Forage access</div>
                 <div class="profile-options" data-group="forage">
@@ -157,7 +171,6 @@
                   <button class="profile-btn" data-value="limited">Limited / Restricted</button>
                 </div>
               </div>
-
             </div>
           </div>
 
@@ -267,6 +280,24 @@
             </div>
           </div>
 
+          <!-- SHARE -->
+          <div class="share-block" id="shareBlock" style="display:none;">
+            <div class="share-block-header">Share this breakdown</div>
+            <div class="share-btn-row">
+              <button class="btn btn-share" id="shareLinkBtn">&#128279; Copy Link</button>
+              <button class="btn btn-share" id="shareCardBtn">&#128247; Screenshot Card</button>
+            </div>
+            <div id="shareLinkMsg" class="share-link-msg" style="display:none;"></div>
+          </div>
+
+          <!-- SHARE CARD (hidden, screenshot target) -->
+          <div id="shareCard" class="share-card" style="display:none;">
+            <div class="share-card-logo">&#9670; HorseNutritionGuide.com</div>
+            <div class="share-card-title" id="shareCardTitle"></div>
+            <div class="share-card-body" id="shareCardBody"></div>
+            <div class="share-card-footer">horsenutritionguide.com — Educational only, not veterinary advice</div>
+          </div>
+
           <!-- Scan another -->
           <div class="scan-again-wrap">
             <label class="btn btn-secondary btn-full" for="ocrFileInput2">
@@ -367,6 +398,8 @@
     </div>
   </footer>
 
+  <script src="feed-library.js"></script>
+  <script src="ration-builder.js"></script>
   <script src="script.js"></script>
 </body>
 </html>
