@@ -2290,26 +2290,10 @@ document.addEventListener('DOMContentLoaded', function () {
       const mediaType = selectedFile.type || 'image/jpeg';
 
       // Call Claude API with vision
-      const response = await fetch('https://api.anthropic.com/v1/messages', {
+      const response = await fetch('https://horse-nutrition-ocr.bridleandbit.workers.dev/ocr', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json', 'x-api-key': ['sk-ant-api03-0WLOLiS','jpGDmNhBdss04LoycXT2Ol_ooyazyx','nOfFWaxwVOTvJvF_-Jh0ZIkOk-yDkQkDKJvZZ79FmZUZKLung-Ll5u_AAA'].join(''), 'anthropic-version': '2023-06-01' },
-        body: JSON.stringify({
-          model: 'claude-sonnet-4-6',
-          max_tokens: 2000,
-          messages: [{
-            role: 'user',
-            content: [
-              {
-                type: 'image',
-                source: { type: 'base64', media_type: mediaType, data: base64 }
-              },
-              {
-                type: 'text',
-                text: 'This is a photo of a horse feed label. Extract ALL text from this label as accurately as possible.\n\nReturn ONLY the extracted text, structured exactly as it appears on the label. Preserve section headers (GUARANTEED ANALYSIS, INGREDIENTS, FEEDING DIRECTIONS) and their formatting.\n\nFor GUARANTEED ANALYSIS: extract every row with its value and unit (%, ppm, IU/lb, mg/lb, etc.).\nFor INGREDIENTS: list them in the exact order shown, comma-separated.\nFor FEEDING DIRECTIONS: extract the full text.\n\nDo not add commentary or any text not on the label. If the image is too blurry or the label is not visible, respond with exactly: UNREADABLE'
-              }
-            ]
-          }]
-        })
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ image: base64, mediaType: mediaType })
       });
 
       if (!response.ok) {
