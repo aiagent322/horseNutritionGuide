@@ -300,6 +300,105 @@ function ul(items) {
 // ─────────────────────────────────────────────
 // FEED TYPE CLASSIFIER
 // ─────────────────────────────────────────────
+// ─────────────────────────────────────────────
+// FEED FORM DETECTION
+// Detects textured, pelleted, extruded, cube,
+// or mixed form from label text and ingredients
+// ─────────────────────────────────────────────
+function detectFeedForm(text, ingText) {
+  const lower    = textLower(text);
+  const ingLower = textLower(ingText || '');
+
+  const signals = {
+    textured:  false,
+    pelleted:  false,
+    extruded:  false,
+    cube:      false,
+    crumble:   false,
+    loose:     false
+  };
+
+  // ── Explicit label keywords (product name / packaging text)
+  if (/textur/i.test(text))                                          signals.textured  = true;
+  if (/pellet/i.test(text))                                          signals.pelleted  = true;
+  if (/extrud/i.test(text))                                          signals.extruded  = true;
+  if (/\bcube\b|\bcubes\b/i.test(text))                            signals.cube      = true;
+  if (/crumble/i.test(text))                                         signals.crumble   = true;
+  if (/loose|mash|meal mix|grain mix|sweet feed/i.test(text))        signals.loose     = true;
+
+  // ── Infer textured from ingredient list patterns
+  // Whole, cracked, rolled, flaked, steam-flaked = textured
+  if (!signals.textured && !signals.pelleted && !signals.extruded) {
+    const texturedIngredients = /(whole oats|cracked corn|rolled oat|rolled barley|flaked corn|steam.flaked|crimped|kibbled|whole grain|coarsely)/i;
+    if (texturedIngredients.test(ingLower || text)) signals.textured = true;
+  }
+
+  // ── Infer pelleted if ingredients are ground/meal form with no textured signals
+  if (!signals.textured && !signals.extruded && !signals.cube) {
+    const groundIngredients = /(ground corn|ground oat|ground barley|wheat middling|dehydrated alfalfa meal|soybean meal|canola meal)/i;
+    const hasGround = groundIngredients.test(ingLower || text);
+    const noTexture = !/(whole oats|cracked corn|rolled|flaked|steam.flaked)/i.test(ingLower || text);
+    if (hasGround && noTexture) signals.pelleted = true;
+  }
+
+  // ── Build result
+  const detected = Object.entries(signals).filter(([,v]) => v).map(([k]) => k);
+
+  if (!detected.length) return null;
+
+  // ── Descriptions and implications for each form
+  const formInfo = {
+    textured: {
+      label: 'Textured (Sweet Feed)',
+      desc: 'Contains whole, cracked, rolled, or flaked grains mixed with other ingredients. Horses can sort textured feeds — picking out preferred pieces and leaving others. Nutrient intake may be uneven if a horse sorts. Higher palatability but more variable consumption.',
+      digestion: 'Whole or minimally processed grains digest more slowly than extruded forms. Large grain meals can overwhelm small intestine capacity — small frequent meals are important.',
+      caution: signals.textured ? 'Horses with choke risk, dental problems, or rapid eating habits should be evaluated before feeding a textured feed.' : ''
+    },
+    pelleted: {
+      label: 'Pelleted',
+      desc: 'Ingredients are ground, mixed, and compressed into uniform pellets. Horses cannot sort pelleted feeds — they consume the full formulation as intended. More consistent nutrient delivery than textured.',
+      digestion: 'Pellets dissolve quickly when wet. Horses that eat pellets very fast may benefit from a slow feeder or soaking. Probiotic viability can be reduced by the heat of pelleting.',
+      caution: 'Fast eaters and horses with choke history should be monitored. Soaking pellets adds moisture and slows consumption.'
+    },
+    extruded: {
+      label: 'Extruded',
+      desc: 'Cooked under high heat and pressure, then formed into expanded shapes. Starch is gelatinized during extrusion, which significantly improves digestibility in the small intestine — less undigested starch reaches the hindgut.',
+      digestion: 'Extruded feeds have the highest starch digestibility of any processing method. This reduces hindgut fermentation of starch, which lowers risk of hindgut acidosis and related issues. A meaningful advantage for starch-sensitive horses.',
+      caution: 'Heat from extrusion can reduce viability of added probiotics and some vitamins. Check whether the manufacturer adds heat-stable or post-extrusion forms of sensitive nutrients.'
+    },
+    cube: {
+      label: 'Cubes / Hay Cubes',
+      desc: 'Compressed forage or forage-concentrate mix formed into large cubes. Often used as a hay replacement or supplement. Cubes must be chewed adequately — soaking is recommended for horses with dental problems or choke history.',
+      digestion: 'Cubes slow intake compared to loose hay. Soaking improves hydration and safety for horses that bolt their feed.',
+      caution: 'Horses with poor dentition, choke history, or rapid eating should have cubes soaked before feeding.'
+    },
+    crumble: {
+      label: 'Crumble',
+      desc: 'A pelleted feed that has been broken into smaller pieces. Similar to pellets in nutrient consistency — horses cannot sort. Often used for young horses or horses that resist pellets.',
+      digestion: 'Similar digestibility to pellets. Smaller particle size may be preferred by some horses.',
+      caution: ''
+    },
+    loose: {
+      label: 'Loose / Grain Mix / Mash',
+      desc: 'A loose blend of grain and other ingredients. Similar sorting potential to textured feeds. Mash forms are often mixed with water before feeding, which improves hydration and slows consumption.',
+      digestion: 'Digestibility depends on individual ingredient processing. Adding water to loose or mash feeds can improve intake and reduce choke risk.',
+      caution: 'Wet mashes should be fed fresh — do not leave wet feed out for more than a few hours, especially in warm weather.'
+    }
+  };
+
+  const primary = detected[0];
+  const info    = formInfo[primary] || {};
+
+  return {
+    detected,
+    primary,
+    label:     info.label     || primary,
+    desc:      info.desc      || '',
+    digestion: info.digestion || '',
+    caution:   info.caution   || ''
+  };
+}
+
 function classifyFeedType(text) {
   const lower = textLower(text);
   const types = [];
@@ -694,6 +793,7 @@ function decodeLabel(text) {
   const analysis           = extractAnalysis(text);
   const ingredientOrderFlags = hasIngList ? analyzeIngredientOrder(text) : [];
   const ingredientOrderHTML  = renderIngredientOrderHTML(ingredientOrderFlags);
+  const feedForm             = detectFeedForm(text, ingText);
 
   // ── No-ingredient-list warning banner
   const noIngBanner = !hasIngList
@@ -705,9 +805,22 @@ function decodeLabel(text) {
     : '';
 
   // ── Feed Type
+  const feedFormHTML = feedForm ? (() => {
+    const cautionBlock = feedForm.caution
+      ? `<div style="background:#FBF0DC;border:1px solid rgba(200,130,26,0.2);border-radius:5px;padding:7px 11px;margin-top:6px;font-size:0.82rem;color:#5C3A1A;">&#9888; ${feedForm.caution}</div>`
+      : '';
+    return `<div style="background:#F8F4EE;border:1px solid rgba(200,182,154,0.35);border-radius:6px;padding:12px 14px;margin-top:14px;">
+      <div style="font-size:0.72rem;font-weight:700;letter-spacing:0.1em;text-transform:uppercase;color:#C8821A;margin-bottom:4px;">Feed Form</div>
+      <strong style="color:#1C3A2F">${feedForm.label}</strong><br>
+      <span style="font-size:0.85rem;color:#3D3D38">${feedForm.desc}</span><br><br>
+      <span style="font-size:0.85rem;color:#3D3D38"><strong>Digestion note:</strong> ${feedForm.digestion}</span>
+      ${cautionBlock}
+    </div>`;
+  })() : '';
+
   const feedTypeHTML = noIngBanner + feedTypes.map(ft =>
     `<strong>${ft.label}</strong> <em>(${ft.confidence} confidence)</em><br><span style="font-size:0.88rem">${ft.reason}</span>`
-  ).join('<br><br>');
+  ).join('<br><br>') + feedFormHTML;
 
   // ── Energy Sources
   const noIngMsg = '<em style="color:#888;font-size:0.88rem">Ingredient list not detected — paste the full label including the INGREDIENTS section to see energy sources.</em>';
