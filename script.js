@@ -301,6 +301,82 @@ function ul(items) {
 // FEED TYPE CLASSIFIER
 // ─────────────────────────────────────────────
 // ─────────────────────────────────────────────
+// FEEDING DIRECTIONS PARSER
+// Extracts feeding rate and calculates daily
+// nutrient delivery from analysis values
+// ─────────────────────────────────────────────
+function parseFeedingDirections(text, analysis) {
+  // Try to isolate feeding directions section
+  // Find feeding directions section
+  const dirIdx = text.search(/feeding\s*directions?/i);
+  if (dirIdx < 0) return null;
+  const dirRaw = text.slice(dirIdx + text.slice(dirIdx).match(/feeding\s*directions?[^\n]*/i)[0].length);
+  const dirText = dirRaw.split(/\n\n\n|important:/i)[0].trim();
+  if (dirText.length < 10) return null;
+
+  // Extract daily feeding rate — look for lbs/day patterns
+  const lbMatch = dirText.match(/(\d+(?:\.\d+)?)\s*(?:to|-)\s*(\d+(?:\.\d+)?)\s*lbs?/i);
+  const singleLbMatch = dirText.match(/(\d+(?:\.\d+)?)\s*lbs?\s*(?:per\s*day|daily|\/day)/i);
+  const kgMatch  = dirText.match(/(\d+(?:\.\d+)?)\s*(?:to|-)\s*(\d+(?:\.\d+)?)\s*kg/i);
+
+  let minLbs = null, maxLbs = null, midLbs = null;
+  if (lbMatch) {
+    minLbs = parseFloat(lbMatch[1]);
+    maxLbs = parseFloat(lbMatch[2]);
+    midLbs = (minLbs + maxLbs) / 2;
+  } else if (singleLbMatch) {
+    minLbs = maxLbs = midLbs = parseFloat(singleLbMatch[1]);
+  } else if (kgMatch) {
+    minLbs = parseFloat(kgMatch[1]) * 2.205;
+    maxLbs = parseFloat(kgMatch[2]) * 2.205;
+    midLbs = (minLbs + maxLbs) / 2;
+  }
+
+  if (midLbs === null) return { dirText, rate: null, nutrients: null };
+
+  // Extract horse weight reference
+  const weightMatch = dirText.match(/(\d+(?:,\d+)?)\s*(?:lb|pound|kg|kilogram)/i);
+  const refWeightLbs = weightMatch
+    ? (weightMatch[0].toLowerCase().includes('kg') ? parseFloat(weightMatch[1]) * 2.205 : parseFloat(weightMatch[1].replace(',','')))
+    : 1000; // default 1000 lb horse
+
+  // Calculate daily nutrient delivery at mid feeding rate
+  const nutrients = {};
+
+  if (analysis.protein) {
+    // Convert % to grams: lbs * 453.6 g/lb * (% / 100)
+    const grams = midLbs * 453.6 * (analysis.protein.value / 100);
+    nutrients.protein = `~${Math.round(grams)}g crude protein/day`;
+  }
+
+  if (analysis.selenium) {
+    // ppm = mg/kg; convert lbs to kg first
+    const kgFed = midLbs * 0.4536;
+    const mgSe  = kgFed * analysis.selenium.value;
+    const safeLimit = 2.0;
+    const pct = Math.round((mgSe / safeLimit) * 100);
+    nutrients.selenium = `~${mgSe.toFixed(2)}mg selenium/day (${pct}% of the commonly cited 2mg/day safe upper limit)`;
+  }
+
+  if (analysis.vitE) {
+    // IU/lb × lbs fed
+    const iuDay = midLbs * analysis.vitE.value;
+    const needEstimate = refWeightLbs * 1.5; // ~1.5 IU/lb body weight is common recommendation
+    nutrients.vitE = `~${Math.round(iuDay)} IU Vitamin E/day (a ${refWeightLbs}-lb horse at maintenance may need ~${Math.round(needEstimate)} IU/day from all sources)`;
+  }
+
+  return {
+    dirText,
+    rate: minLbs === maxLbs
+      ? `${minLbs} lbs/day`
+      : `${minLbs}–${maxLbs} lbs/day`,
+    midLbs,
+    refWeightLbs,
+    nutrients
+  };
+}
+
+// ─────────────────────────────────────────────
 // RED FLAG INGREDIENT COMBINATIONS
 // Detects known problematic pairings or patterns
 // that a horse owner should be aware of
@@ -996,6 +1072,7 @@ function decodeLabel(text) {
   const feedForm             = detectFeedForm(text, ingText);
   const redFlags             = detectRedFlags(text, ingText, analysis);
   const redFlagsHTML         = renderRedFlagsHTML(redFlags);
+  const feedingDir           = parseFeedingDirections(text, analysis);
 
   // ── No-ingredient-list warning banner
   const noIngBanner = !hasIngList
@@ -1402,9 +1479,25 @@ function decodeLabel(text) {
   const biotinMatch = text.match(/biotin[^0-9]*([0-9]+\.?[0-9]*)\s*mg/i);
   if (biotinMatch) extraAnalysis.push(`Biotin: ${biotinMatch[1]} mg/lb (min) — supports hoof integrity and coat quality.`);
 
+  // ── Feeding directions block
+  let feedingDirHTML = '';
+  if (feedingDir && feedingDir.rate) {
+    const nutLines = Object.values(feedingDir.nutrients || {});
+    feedingDirHTML = `<div style="background:#F2F7F4;border:1px solid rgba(61,122,94,0.2);border-radius:6px;padding:12px 14px;margin-top:14px;">
+      <div style="font-size:0.72rem;font-weight:700;letter-spacing:0.1em;text-transform:uppercase;color:#2D5C47;margin-bottom:6px;">Feeding Rate Detected</div>
+      <strong style="color:#1C3A2F">${feedingDir.rate}</strong> (for a ${feedingDir.refWeightLbs}-lb horse)<br>
+      ${nutLines.length ? '<br><strong style="font-size:0.82rem;color:#1C3A2F">Estimated daily nutrient delivery at mid feeding rate:</strong><br>' + nutLines.map(n => `<span style="font-size:0.83rem;color:#3D3D38">• ${n}</span>`).join('<br>') : ''}
+      <br><br><em style="font-size:0.79rem;color:#888">Estimates based on label values — actual amounts vary by exact feeding rate, horse size, and feed density. Always reference the original label and consult your vet or nutritionist for horses with specific health needs.</em>
+    </div>`;
+  } else if (feedingDir && feedingDir.dirText) {
+    feedingDirHTML = `<div style="background:#F2F7F4;border:1px solid rgba(61,122,94,0.2);border-radius:6px;padding:10px 14px;margin-top:14px;font-size:0.85rem;color:#3D3D38;">
+      <strong style="color:#1C3A2F">Feeding directions found</strong> but feeding rate could not be parsed automatically. See original label for directions.
+    </div>`;
+  }
+
   const analysisHTML = (anNotes.length || extraAnalysis.length)
-    ? ul([...anNotes, ...extraAnalysis]) + '<br><small style="color:#888">Values based on text matching — always reference the original label for accuracy.</small>'
-    : 'No guaranteed analysis values detected. Paste the full guaranteed analysis panel for this section to populate.';
+    ? ul([...anNotes, ...extraAnalysis]) + '<br><small style="color:#888">Values based on text matching — always reference the original label for accuracy.</small>' + feedingDirHTML
+    : 'No guaranteed analysis values detected. Paste the full guaranteed analysis panel for this section to populate.' + feedingDirHTML;
 
   // ── Questions to Ask
   const missing = [];
