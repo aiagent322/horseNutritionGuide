@@ -204,7 +204,7 @@ const ANALYSIS_GUIDE = [
   {
     term: 'NSC (Non-Structural Carbohydrate)',
     unit: 'Maximum % (max)',
-    desc: 'The sum of starch + sugar (WSC). The most commonly cited carbohydrate figure for metabolic horses. Many equine nutritionists recommend feeds with an NSC below 10–12% for horses with insulin resistance, PPID, or laminitis history. If NSC is not listed, ask the manufacturer.'
+    desc: 'The sum of starch + sugar — the total fast-digesting carbohydrate load. EMS (Equine Metabolic Syndrome) is a condition where a horse becomes insulin-resistant, causing chronically elevated insulin that damages hoof tissue and triggers laminitis. PPID (Cushing\'s disease) causes the same problem via excess cortisol. Both need total diet NSC below 10%. PSSM horses (genetic muscle glycogen disorder) also need NSC below 10%. Healthy horses in work are fine up to 20% NSC. If NSC is not listed, ask the manufacturer for the tested value.'
   }
 ];
 
@@ -568,7 +568,7 @@ function detectRedFlags(text, ingText, analysis) {
     flags.push({
       level: 'critical',
       title: 'Molasses + High NSC',
-      detail: `Molasses is present in the ingredient list and NSC appears to be approximately ${effectiveNSC}%. Metabolic horses — those with insulin resistance, EMS, PPID/Cushing's, or laminitis history — typically need diets below 10–12% NSC. This label shows both molasses and elevated NSC, which is a concern for those horses.`
+      detail: `Molasses is present in the ingredient list and NSC appears to be approximately ${effectiveNSC}%. EMS (Equine Metabolic Syndrome) and PPID (Cushing's disease) both cause impaired insulin regulation — the horse produces excess insulin in response to sugar and starch, which damages hoof tissue and causes laminitis. Molasses is a concentrated sugar source, and this label shows both molasses and elevated NSC at approximately ${effectiveNSC}%. For horses with EMS, PPID, or laminitis history, this combination makes this feed a poor choice. The right feed for those horses is low-NSC: Triple Crown Lite (9.3%), Nutrena SafeChoice Special Care, or Buckeye Safe N Easy (12.5%).`
     });
   }
 
@@ -649,8 +649,7 @@ function detectRedFlags(text, ingText, analysis) {
     flags.push({
       level: 'critical',
       title: 'Not Appropriate for PSSM / Tying-Up / RER',
-      detail: `This feed appears to be grain-forward${grainInTop5.length ? ` (${grainInTop5.slice(0,3).join(', ')} detected near the top of the ingredient list)` : ''}${effectiveNSCPSSM ? ` with an NSC of approximately ${effectiveNSCPSSM}%` : ''}. Horses with Polysaccharide Storage Myopathy (PSSM type 1 or 2), Recurrent Exertional Rhabdomyolysis (RER), or recurring tying-up require a diet with very low starch and sugar — typically below 10–12% NSC total. High-grain feeds can trigger acute episodes. If your horse has any history of muscle stiffness, reluctance to move, or "tying-up," horses with muscle conditions like PSSM or RER typically need diets well below 10–12% NSC — this grain-forward profile is a concern for those horses.`
-    });
+      detail: `This feed appears to be grain-forward${grainInTop5.length ? ` (${grainInTop5.slice(0,3).join(', ')} detected near the top of the ingredient list)` : ''}${effectiveNSCPSSM ? ` with an NSC of approximately ${effectiveNSCPSSM}%` : ''}. PSSM (Polysaccharide Storage Myopathy) is a genetic muscle condition — affected horses abnormally store glycogen in their muscles, and grain starch feeds that glycogen buildup, causing muscle pain, stiffness, and tying-up episodes. RER (Recurrent Exertional Rhabdomyolysis) is a related muscle condition with the same dietary requirement: very low starch and sugar, below 10% NSC. For a horse that ties up, the right feed is high-fat, high-fiber, very low-starch: Triple Crown Low Starch (13.5% NSC), Buckeye Safe N Easy (12.5%), or Nutrena SafeChoice Special Care — paired with added fat like rice bran or vegetable oil for calories.`    });
   }
 
   // ── 10. EMS/IR horse — high NSC flag independent of molasses
@@ -658,7 +657,7 @@ function detectRedFlags(text, ingText, analysis) {
     flags.push({
       level: 'critical',
       title: 'High NSC — Not for Metabolic Horses',
-      detail: `NSC appears to be approximately ${effectiveNSCPSSM}%. This exceeds the commonly recommended threshold of 10–12% NSC for horses with insulin resistance (IR), Equine Metabolic Syndrome (EMS), or laminitis history. Metabolic horses typically need diets below 10–12% NSC — this is a concern for those horses.`
+      detail: `NSC appears to be approximately ${effectiveNSCPSSM}%. EMS (Equine Metabolic Syndrome) is a condition where the horse's cells stop responding normally to insulin — the body overproduces insulin in response to sugar and starch, and that excess insulin directly damages the laminae inside the hoof wall, causing laminitis. PPID (Cushing's disease) causes the same insulin dysregulation through overproduction of cortisol. Horses with EMS, PPID, or laminitis history need total diet NSC below 10%. For those horses, this feed at ~${effectiveNSCPSSM}% NSC is too high. Better fits: Triple Crown Lite (9.3% NSC), Triple Crown Low Starch (13.5%), Nutrena SafeChoice Special Care, or Buckeye Safe N Easy (12.5%).`
     });
   }
 
@@ -1113,8 +1112,7 @@ function analyzeIngredientOrder(text) {
   if (top3Starch.length >= 2) {
     flags.push({
       level: 'caution',
-      text: `<strong>High-starch ingredients lead the list.</strong> "${top3Starch.join('", "')}" appear among the first three ingredients — meaning they make up the largest portion of this feed by weight. This is a grain-forward formula. Metabolic horses — those with insulin resistance, laminitis, EMS, or PPID/Cushing's — typically need low-starch diets. This grain-forward profile is a concern for those horses.`
-    });
+      text: `<strong>High-starch ingredients lead the list.</strong> "${top3Starch.join('", "')}" appear among the first three ingredients — meaning they make up the largest portion of this feed by weight. Laminitis is an inflammation of the laminae — the tissue bonding the hoof wall to the coffin bone. High dietary starch and sugar cause insulin spikes; in horses with EMS, PPID/Cushing's, or a history of laminitis, those spikes can trigger laminitic episodes. A fiber-based lead (beet pulp, soybean hulls, alfalfa) is far safer for those horses than grain at the top of the ingredient list.`    });
   } else if (top3Starch.length === 1) {
     flags.push({
       level: 'note',
@@ -1280,8 +1278,13 @@ function buildIntroSummary(text, analysis, feedTypes, feedForm, fiberFound, grai
   const use    = profile && profile.use    ? profile.use    : null;
 
   const healthLabels = {
-    ir: 'insulin resistance', laminitis: 'laminitis history', cushings: "Cushing's disease",
-    pssm: 'PSSM / tying-up', ulcers: 'ulcers', hoof: 'hoof quality issues', weight_loss: 'hard keeper'
+    ir: 'insulin resistance (IR/EMS)',
+    laminitis: 'laminitis or founder history',
+    cushings: "Cushing's disease (PPID)",
+    pssm: 'PSSM or tying-up history',
+    ulcers: 'ulcer or digestive history',
+    hoof: 'hoof quality issues',
+    weight_loss: 'hard keeper'
   };
   const healthDesc = health.filter(h => h !== 'none').map(h => healthLabels[h] || h);
 
@@ -1361,7 +1364,7 @@ function buildIntroSummary(text, analysis, feedTypes, feedForm, fiberFound, grai
     } else if (nscVal <= 15) {
       nscSent += ` This is moderate. Use caution with insulin-sensitive horses and verify this fits within their total daily NSC budget.`;
     } else {
-      nscSent += ` This is elevated. Metabolic horses typically need diets below 10–12% NSC. This feed's NSC is a concern for horses with insulin resistance, EMS, laminitis history, Cushing's, or PSSM.`;
+      nscSent += ` This is elevated. Metabolic horses typically need diets below 10–12% NSC. EMS, PPID/Cushing's, laminitis-prone, and PSSM horses all do best below 10% NSC. For those horses, look instead at Triple Crown Lite (9.3% NSC), Triple Crown Low Starch (13.5%), Nutrena SafeChoice Special Care, or Buckeye Safe N Easy (12.5%).`;
     }
     sentences.push(nscSent);
   } else if (hasMolasses && (grainLead || mixedEnergy)) {
