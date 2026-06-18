@@ -1191,7 +1191,43 @@ function decodeLabel(text) {
 
     const notes = [];
     if (analysis.vitE) {
-      notes.push(`Vitamin E listed at ${analysis.vitE.value} IU/lb. Horses without pasture access typically need 1–2 IU per pound of body weight daily from all sources.`);
+      const vitEVal = analysis.vitE.value;
+
+      // ── Detect Vitamin E form from ingredient list
+      const hasNatural   = /d-alpha.tocopherol|natural.vitamin.e|d-alpha.tocopheryl acetate(?!.*dl-)/i.test(ingText || text);
+      const hasSynthetic = /dl-alpha.tocopherol|dl-alpha.tocopheryl/i.test(ingText || text);
+      const hasGeneric   = /vitamin\s*e\s*supplement|mixed\s*tocopherol/i.test(ingText || text);
+
+      let vitEFormNote = '';
+      if (hasNatural && !hasSynthetic) {
+        vitEFormNote = `<div style="background:#E8F2ED;border:1px solid rgba(61,122,94,0.25);border-radius:6px;padding:8px 12px;margin-top:6px;font-size:0.85rem;color:#1C3A2F;">
+          <strong>Vitamin E form: Natural (d-alpha-tocopherol).</strong><br>
+          Natural vitamin E is 2–3× more bioavailable than synthetic forms. The horse's body absorbs and retains it more efficiently. This is the preferred form for horses with neurological conditions, muscle issues, or high Vitamin E requirements.
+        </div>`;
+      } else if (hasSynthetic && !hasNatural) {
+        vitEFormNote = `<div style="background:#FBF0DC;border:1px solid rgba(200,130,26,0.2);border-radius:6px;padding:8px 12px;margin-top:6px;font-size:0.85rem;color:#5C3A1A;">
+          <strong>Vitamin E form: Synthetic (dl-alpha-tocopherol).</strong><br>
+          Synthetic Vitamin E is less bioavailable than natural forms — the horse must consume more IU to achieve the same tissue levels. If your horse has specific Vitamin E needs (EMND, EPM recovery, muscle issues), discuss the form with your vet. Some horses on synthetic forms may not achieve adequate tissue levels despite label IU values.
+        </div>`;
+      } else if (hasNatural && hasSynthetic) {
+        vitEFormNote = `<div style="background:#F8F4EE;border:1px solid rgba(200,182,154,0.35);border-radius:6px;padding:8px 12px;margin-top:6px;font-size:0.85rem;color:#5C3A1A;">
+          <strong>Vitamin E form: Mixed (both natural and synthetic detected).</strong><br>
+          Both d-alpha-tocopherol (natural) and dl-alpha-tocopherol (synthetic) appear to be present. The natural portion is significantly more bioavailable. Ask the manufacturer what percentage of the IU value comes from each form.
+        </div>`;
+      } else if (hasIngList) {
+        vitEFormNote = `<div style="background:#F8F4EE;border:1px solid rgba(200,182,154,0.3);border-radius:6px;padding:8px 12px;margin-top:6px;font-size:0.85rem;color:#6B6B64;">
+          <em>Vitamin E form not specified on the label. Ask the manufacturer whether the source is natural (d-alpha-tocopherol) or synthetic (dl-alpha-tocopherol) — the form significantly affects bioavailability.</em>
+        </div>`;
+      }
+
+      // ── IU level context
+      const vitEContext = vitEVal >= 500
+        ? `Vitamin E listed at <strong>${vitEVal} IU/lb</strong> — a generous level. At typical feeding rates this likely meets or exceeds maintenance needs for most horses without pasture access.`
+        : vitEVal >= 200
+        ? `Vitamin E listed at <strong>${vitEVal} IU/lb</strong> — a reasonable level. Horses without pasture access typically need 1–2 IU per pound of body weight daily from all sources. Verify total intake based on your feeding rate.`
+        : `Vitamin E listed at <strong>${vitEVal} IU/lb</strong> — relatively low. Horses without regular pasture access may need supplemental Vitamin E beyond what this feed provides, especially horses with muscle conditions or neurological concerns.`;
+
+      notes.push(vitEContext + vitEFormNote);
     }
     if (analysis.selenium) {
       const seVal = analysis.selenium.value;
