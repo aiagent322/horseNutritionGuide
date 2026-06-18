@@ -1648,43 +1648,111 @@ function decodeLabel(text) {
 
   const missingHTML = missing.length ? ul(missing) : '<em style="color:#888">No specific questions generated — paste the full label for a more complete analysis.</em>';
 
-  // ── Plain-English Summary
+  // ── Plain-English Summary — feed-specific, not template-based
   const feedTypeLabel = feedTypes[0]?.label || 'commercial horse feed';
 
-  let summaryHTML = '';
-  if (!hasIngList) {
-    // Analysis-only summary
-    const aLines = [];
-    aLines.push(`Based on the guaranteed analysis panel, this appears to be a <strong>${feedTypeLabel}</strong>.`);
-    if (analysis.protein) aLines.push(`Crude protein is listed at ${analysis.protein.value}% (min).`);
-    if (analysis.fat) aLines.push(`Crude fat is ${analysis.fat.value}% (min)${analysis.fat.value < 4 ? ' — relatively low' : analysis.fat.value >= 8 ? ' — higher fat formula' : ''}.`);
-    if (allVitamins.length || allMinerals.length) aLines.push(`The analysis panel shows a broad vitamin and mineral profile, suggesting a fully formulated feed rather than a straight grain.`);
-    if (digestFound.length) aLines.push(`Digestive support microorganisms (${digestFound.slice(0,2).join(', ')}) are listed, indicating attention to gut health.`);
-    if (/lysine|methionine|threonine/i.test(text)) aLines.push(`Individual amino acids are guaranteed, which indicates a focus on protein quality.`);
-    aLines.push(`<br>To get a full ingredient-by-ingredient breakdown — including energy sources, fiber, fat, and protein ingredients — paste the complete label including the INGREDIENTS section.`);
-    summaryHTML = aLines.join(' ');
-  } else {
-    const energyType = fiberFound.length >= 2 && grainFound.length <= 1
-      ? 'fiber-based energy sources, which tend to be more hindgut-friendly than grain starches'
-      : grainFound.length >= 2
-        ? 'grain and starch as primary energy sources, which provide quick energy but may not be suitable for metabolic horses'
-        : fiberFound.length && grainFound.length
-          ? 'a mix of fiber and grain energy sources'
-          : 'energy sources as listed above';
+  const summaryHTML = (() => {
+    const sentences = [];
 
-    const digestNote = digestFound.length
-      ? `It includes digestive support ingredients (${digestFound.slice(0,2).join(', ')}), suggesting a focus on gut health.`
-      : '';
-    const sugarNote = nscVal !== null
-      ? `The NSC value is ${nscVal}%, which${nscVal <= 15 ? ' may make it a candidate for' : ' suggests it may not be suitable for'} horses with insulin sensitivity — verify with your vet.`
-      : '';
+    // ── Opening: what type of feed and what form
+    const formLabel = feedForm ? ` (${feedForm.label})` : '';
+    sentences.push(`This appears to be a <strong>${feedTypeLabel}${formLabel}</strong>.`);
 
-    summaryHTML = `Based on the full label text, this appears to be a <strong>${feedTypeLabel}</strong> that uses ${energyType}. 
-${proteinFound.length ? `Protein appears to come primarily from ${proteinFound.slice(0,3).join(', ')}.` : ''}
-${allVitamins.length || allMinerals.length ? 'It contains a broad vitamin and mineral profile, consistent with a fully formulated commercial feed.' : ''}
-${digestNote} ${sugarNote}
-<br><br>Ingredient order on horse feed labels indicates relative quantity — ingredients listed first are present in the largest amounts. For any horse with a known health condition, share this label with a veterinarian or equine nutritionist before feeding.`;
-  }
+    if (!hasIngList) {
+      // Analysis-only path — build from numbers
+      sentences.push('Only the guaranteed analysis panel was detected — the summary below is based on numbers only, not ingredients.');
+
+      if (analysis.protein) {
+        const cp = analysis.protein.value;
+        const cpDesc = cp >= 16 ? ', which is high — appropriate for breeding stock, growing horses, or ration balancers, but more than a mature horse at maintenance needs' : cp >= 12 ? ', a moderate level typical of a formulated concentrate' : ", on the lower end — verify this meets your horse's needs";
+        sentences.push(`Crude protein is <strong>${cp}%</strong>${cpDesc}.`);
+      }
+      if (analysis.fat) {
+        const f = analysis.fat.value;
+        sentences.push(`Crude fat is <strong>${f}%</strong>${f >= 10 ? ' — meaningful fat content that adds caloric density' : f < 4 ? ' — low fat; this is not a fat-based energy feed' : ''}.`);
+      }
+      if (analysis.selenium && analysis.selenium.value > 0.3) {
+        sentences.push(`Selenium is listed at <strong>${analysis.selenium.value} ppm</strong> — above the commonly cited 0.3 mg/kg safe upper limit for feed. Total selenium from all sources should be reviewed with your vet.`);
+      }
+      if (allVitamins.length >= 4 || allMinerals.length >= 4) {
+        sentences.push('The analysis shows a broad vitamin and mineral profile — consistent with a fully formulated commercial feed rather than a raw grain.');
+      }
+      if (digestFound.length) {
+        sentences.push(`Digestive support ingredients (${digestFound.slice(0,2).join(', ')}) are listed, indicating attention to hindgut health.`);
+      }
+      if (/lysine|methionine|threonine/i.test(text)) {
+        sentences.push('Individual amino acids are guaranteed in the analysis — a sign of a feed focused on protein quality, not just crude protein quantity.');
+      }
+      sentences.push('<br>For a full ingredient-by-ingredient breakdown, paste the complete label including the INGREDIENTS section.');
+
+    } else {
+      // Full label path — build from ingredient signals + analysis
+
+      // Energy character
+      if (fiberFound.length >= 2 && grainFound.length <= 1) {
+        sentences.push(`Energy comes primarily from <strong>digestible fiber</strong> (${fiberFound.slice(0,2).join(', ')}) — a hindgut-friendly approach that produces less risk of starch overload compared to grain-forward feeds.`);
+      } else if (grainFound.length >= 2 && fiberFound.length <= 1) {
+        sentences.push(`Energy comes primarily from <strong>grain and starch</strong> (${grainFound.slice(0,2).join(', ')}) — quick-burning energy appropriate for working horses but not ideal for horses with metabolic conditions.`);
+      } else if (grainFound.length >= 1 && fiberFound.length >= 1) {
+        sentences.push(`Energy comes from a <strong>mix of grain and fiber</strong> — grain provides quick energy while fiber sources support hindgut health and provide slower-burning calories.`);
+      }
+
+      // Protein sources
+      const ingProtein = proteinFound.filter(p => !['lysine','methionine','threonine'].includes(p.toLowerCase()));
+      if (ingProtein.length) {
+        sentences.push(`Primary protein source${ingProtein.length > 1 ? 's' : ''}: <strong>${ingProtein.slice(0,2).join(', ')}</strong>.`);
+      }
+
+      // Molasses position — specific
+      const ingList = parseIngredientOrder(text);
+      const molassesIdx = ingList.findIndex(i => /molasses|cane molasses/.test(i));
+      if (molassesIdx >= 0 && molassesIdx <= 4) {
+        sentences.push(`<strong>Molasses appears at position #${molassesIdx + 1}</strong> in the ingredient list — a meaningful sugar contributor. Horses with metabolic conditions should not be fed this without veterinary guidance.`);
+      } else if (molassesIdx >= 5) {
+        sentences.push(`Molasses is present but at position #${molassesIdx + 1} — likely a small amount for palatability.`);
+      }
+
+      // NSC situation
+      const calcNSCVal = (sugarVal !== null && starchVal !== null) ? sugarVal + starchVal : null;
+      const effectiveNSC = nscVal || calcNSCVal;
+      if (effectiveNSC !== null) {
+        const nscSrc = nscVal ? 'listed' : 'calculated from sugar + starch';
+        const nscDesc = effectiveNSC <= 10 ? 'low — potentially suitable for metabolic horses (always verify with your vet)' : effectiveNSC <= 15 ? 'moderate — use caution with insulin-sensitive horses' : "elevated — not appropriate for horses with insulin resistance, EMS, laminitis, or PPID/Cushing's without veterinary guidance";
+        sentences.push(`NSC is <strong>~${effectiveNSC}%</strong> (${nscSrc}) — ${nscDesc}.`);
+      } else if (grainFound.length >= 2 || molassesIdx >= 0 && molassesIdx <= 4) {
+        sentences.push('NSC was not listed or calculable from this label. Given the ingredient profile, ask the manufacturer for tested NSC, sugar, and starch values before feeding to metabolic horses.');
+      }
+
+      // Selenium flag
+      if (analysis.selenium && analysis.selenium.value > 0.3) {
+        sentences.push(`Selenium is <strong>${analysis.selenium.value} ppm</strong> — above the commonly cited safe limit for feed. Total selenium from all sources must be reviewed with your vet.`);
+      }
+
+      // Digestive support
+      if (digestFound.length) {
+        const isProbiotic = digestFound.some(d => /lactobacillus|enterococcus|pediococcus/.test(d.toLowerCase()));
+        const isYeast = digestFound.some(d => /saccharomyces|yeast/.test(d.toLowerCase()));
+        if (isProbiotic && isYeast) {
+          sentences.push(`Contains both <strong>live probiotic bacteria</strong> and <strong>yeast culture</strong> for digestive support.${feedForm && (feedForm.primary === 'pelleted' || feedForm.primary === 'extruded') ? ' Note: live bacteria viability may be reduced by processing heat — ask the manufacturer.' : ''}`);
+        } else if (isProbiotic) {
+          sentences.push(`Contains <strong>live probiotic bacteria</strong> (${digestFound.filter(d => /lactobacillus|enterococcus|pediococcus/.test(d.toLowerCase())).slice(0,2).join(', ')}) for digestive support.`);
+        } else if (isYeast) {
+          sentences.push('Contains <strong>yeast culture</strong> for hindgut fermentation support.');
+        }
+      }
+
+      // Red flags callout
+      const criticalFlags = redFlags.filter(f => f.level === 'critical');
+      if (criticalFlags.length) {
+        sentences.push(`<strong style="color:#8B2E00">⚠ ${criticalFlags.length} critical concern${criticalFlags.length > 1 ? 's' : ''} detected</strong> — see the Vitamins & Minerals section for details.`);
+      }
+
+      // Closing
+      sentences.push('<br>Ingredient order on labels indicates relative quantity by weight — the first ingredient is present in the largest amount. For any horse with a known health condition, share this label with a veterinarian or equine nutritionist before feeding.');
+    }
+
+    return sentences.filter(Boolean).join(' ');
+  })();
 
   // ── Vet Conditions
   const vetHTML = 'Consult a licensed veterinarian or qualified equine nutritionist if:' + ul([
