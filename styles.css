@@ -1393,3 +1393,29 @@ ul li { margin-bottom: 0.35rem; }
   .share-btn-row { flex-direction: column; }
   .btn-share { width: 100%; }
 }
+
+/* ── Ingredient cards — linked version */
+.ingredient-card-link {
+  display: block;
+  text-decoration: none;
+  color: inherit;
+  cursor: pointer;
+  transition: transform 0.15s, box-shadow 0.15s;
+}
+
+.ingredient-card-link:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 6px 20px rgba(0,0,0,0.10);
+}
+
+.ingredient-card-link:hover .ingredient-name {
+  color: var(--green-mid);
+}
+
+.ingredient-link-hint {
+  font-size: 0.78rem;
+  font-weight: 600;
+  color: var(--green-mid);
+  margin-top: 8px;
+  letter-spacing: 0.02em;
+}

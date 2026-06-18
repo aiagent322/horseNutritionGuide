@@ -11,106 +11,127 @@
 const INGREDIENT_LIBRARY = [
   {
     name: 'Beet Pulp',
+    url:  'ingredients/beet-pulp.html',
     category: 'Fiber / Energy',
     desc: 'A byproduct of sugar beet processing. The sugar has been extracted, leaving highly digestible fiber. A good "safe" energy source for horses that don\'t tolerate grain well. Typically low in sugar and starch when plain (not molasses-coated).'
   },
   {
     name: 'Soybean Hulls',
+    url:  'ingredients/soybean-hulls.html',
     category: 'Fiber',
     desc: 'The outer shell of soybeans. Highly digestible fiber with a low sugar and starch content. Often used in senior or low-starch feeds as a gut-friendly filler and fiber source.'
   },
   {
     name: 'Alfalfa Meal / Dehydrated Alfalfa',
+    url:  'ingredients/alfalfa-meal.html',
     category: 'Fiber / Protein',
     desc: 'Dried and ground alfalfa. Provides fiber, protein, and calcium. Highly palatable. Adds digestible energy. Horses with calcium-sensitive conditions should have calcium:phosphorus ratios reviewed.'
   },
   {
     name: 'Soybean Meal',
+    url:  'ingredients/soybean-meal.html',
     category: 'Protein',
     desc: 'The high-protein residue left after oil is extracted from soybeans. A very common protein source in horse feeds. Rich in lysine, an essential amino acid horses cannot make on their own.'
   },
   {
     name: 'Rice Bran',
+    url:  'ingredients/rice-bran.html',
     category: 'Fat / Energy',
     desc: 'The outer layer of the rice grain, high in fat (typically 18–22%). Often stabilized to prevent rancidity. Adds calories and supports coat condition. Contains phytate, which may bind phosphorus — calcium:phosphorus balance matters when feeding large amounts.'
   },
   {
     name: 'Flaxseed / Linseed',
+    url:  'ingredients/flaxseed.html',
     category: 'Fat / Omega-3',
     desc: 'Seeds high in omega-3 fatty acids (alpha-linolenic acid). Supports skin, coat, and has anti-inflammatory properties. Should be ground or heat-treated for maximum absorption. Often seen in feeds targeting coat and hoof quality.'
   },
   {
     name: 'Oats',
+    url:  'ingredients/oats.html',
     category: 'Grain / Starch Energy',
     desc: 'One of the most traditional horse grains. Moderate starch content compared to corn or barley, with a fibrous hull that makes them more digestible. Still a starch source — relevant for horses with insulin issues or laminitis.'
   },
   {
     name: 'Corn',
+    url:  'ingredients/corn.html',
     category: 'Grain / Starch Energy',
     desc: 'High energy, high starch grain. Calorie-dense and highly palatable. More starch per pound than oats or barley. May be listed as ground corn, flaked corn, or steam-flaked corn. Not ideal for horses with metabolic conditions.'
   },
   {
     name: 'Barley',
+    url:  'ingredients/barley.html',
     category: 'Grain / Starch Energy',
     desc: 'A grain commonly used in horse feeds. Higher starch than oats but lower than corn. Often processed (rolled, flaked, or steam-flaked) to improve digestibility. A starch source relevant for metabolic horses.'
   },
   {
     name: 'Molasses',
+    url:  'ingredients/molasses.html',
     category: 'Sugar / Palatability',
     desc: 'A byproduct of sugar refining. Used in horse feeds primarily for palatability (horses like the taste) and to reduce dust. Adds sugar — relevant for horses with insulin resistance, PPID, or laminitis risk. Feeds with molasses listed early in the ingredient list contain more of it.'
   },
   {
     name: 'Vegetable Oil',
+    url:  'ingredients/vegetable-oil.html',
     category: 'Fat / Energy',
     desc: 'A concentrated source of fat calories. Adds energy without increasing starch. Supports coat quality. Often added to performance feeds or weight-gain formulas. Source varies (soy, canola, sunflower) but is not always specified.'
   },
   {
     name: 'Salt',
+    url:  'ingredients/salt.html',
     category: 'Mineral / Electrolyte',
     desc: 'Sodium chloride — an essential electrolyte for muscle and nerve function. Horses need salt daily. Its presence in feed does not eliminate the need for free-choice salt access, as individual requirements vary.'
   },
   {
     name: 'Limestone',
+    url:  'ingredients/limestone.html',
     category: 'Mineral / Calcium',
     desc: 'A source of calcium (calcium carbonate). Calcium is essential for bone, muscle, and nerve function. Balancing calcium to phosphorus in the overall diet is important — the ideal ratio is approximately 1.5–2:1 (calcium:phosphorus).'
   },
   {
     name: 'Dicalcium Phosphate',
+    url:  'ingredients/dicalcium-phosphate.html',
     category: 'Mineral / Phosphorus & Calcium',
     desc: 'Provides both calcium and phosphorus. Often used to balance the calcium:phosphorus ratio in a feed, especially when high-calcium ingredients like alfalfa are present.'
   },
   {
     name: 'Yeast Culture',
+    url:  'ingredients/yeast-culture.html',
     category: 'Digestive Support',
     desc: 'A fermentation product (often Saccharomyces cerevisiae). Supports the hindgut microbial environment. May improve fiber digestion. A common ingredient in feeds marketed as digestively supportive.'
   },
   {
     name: 'Probiotics / Lactobacillus',
+    url:  'ingredients/probiotics.html',
     category: 'Digestive Support',
     desc: 'Live beneficial microorganisms. Intended to support a healthy hindgut bacterial population. Stability and viability in pelleted feeds can vary — a veterinarian or nutritionist can advise on whether a standalone probiotic supplement may be more effective.'
   },
   {
     name: 'Biotin',
+    url:  'ingredients/biotin.html',
     category: 'Hoof / Coat Support (Vitamin B7)',
     desc: 'A B vitamin frequently linked to hoof wall integrity and quality. Often added to feeds marketed for hoof support. Research supports its role in hoof horn synthesis. Also supports skin and coat.'
   },
   {
     name: 'Copper',
+    url:  'ingredients/copper.html',
     category: 'Mineral / Trace',
     desc: 'Essential for connective tissue synthesis, pigmentation, and immune function. Horses on high-iron diets (including many hay sources) may require extra copper. Also plays a role in hoof quality and coat color.'
   },
   {
     name: 'Zinc',
+    url:  'ingredients/zinc.html',
     category: 'Mineral / Trace',
     desc: 'Important for skin, hoof, and coat health, as well as immune function and enzyme activity. Often paired with copper on the label. The zinc:copper ratio in the diet matters — typically a 3–4:1 ratio is recommended.'
   },
   {
     name: 'Selenium',
+    url:  'ingredients/selenium.html',
     category: 'Mineral / Trace (Critical)',
     desc: 'An essential antioxidant mineral with a narrow safe range. Deficiency causes muscle problems (white muscle disease); excess causes toxicity (selenosis). Selenium content on labels is expressed in mg/kg or ppm. Soil selenium levels vary widely by region, making this a key item to discuss with your vet or nutritionist.'
   },
   {
     name: 'Vitamin E',
+    url:  'ingredients/vitamin-e.html',
     category: 'Vitamin / Antioxidant',
     desc: 'A fat-soluble antioxidant critical for muscle health, immune function, and neurological health. Fresh pasture is the best natural source — horses without pasture access often need supplementation. Natural vitamin E (d-alpha-tocopherol) is more bioavailable than synthetic forms (dl-alpha-tocopherol).'
   }
@@ -2087,13 +2108,17 @@ function decodeLabel(text) {
 function populateIngredientLibrary() {
   const grid = document.getElementById('ingredientGrid');
   if (!grid) return;
-  grid.innerHTML = INGREDIENT_LIBRARY.map(ing => `
-    <div class="ingredient-card">
+  grid.innerHTML = INGREDIENT_LIBRARY.map(ing => {
+    const inner = `
       <div class="ingredient-name">${ing.name}</div>
       <div class="ingredient-category">${ing.category}</div>
       <p class="ingredient-desc">${ing.desc}</p>
-    </div>
-  `).join('');
+      ${ing.url ? '<div class="ingredient-link-hint">Read more &#8594;</div>' : ''}
+    `;
+    return ing.url
+      ? `<a href="${ing.url}" class="ingredient-card ingredient-card-link">${inner}</a>`
+      : `<div class="ingredient-card">${inner}</div>`;
+  }).join('');
 }
 
 // ─────────────────────────────────────────────
