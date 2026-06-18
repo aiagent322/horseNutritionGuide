@@ -84,6 +84,64 @@
         <div class="decoder-input-area" id="textInputArea">
           <label for="feedInput" class="input-label">Label Text <span class="input-label-sub">— review &amp; edit if needed</span></label>
           <textarea id="feedInput" class="feed-textarea" placeholder="Label text will appear here after scanning. You can also type it in manually."></textarea>
+          <!-- HORSE PROFILE -->
+          <div class="horse-profile" id="horseProfile">
+            <div class="profile-header">
+              <span class="profile-icon">&#128014;</span>
+              <strong>Tell us about your horse</strong>
+              <span class="profile-sub">— so the summary speaks directly to your situation</span>
+            </div>
+
+            <div class="profile-grid">
+
+              <div class="profile-group">
+                <div class="profile-label">Primary use</div>
+                <div class="profile-options" data-group="use">
+                  <button class="profile-btn" data-value="pleasure">Trail / Pleasure</button>
+                  <button class="profile-btn" data-value="performance">Performance / Sport</button>
+                  <button class="profile-btn" data-value="senior">Senior (15+ years)</button>
+                  <button class="profile-btn" data-value="breeding">Breeding / Pregnant</button>
+                  <button class="profile-btn" data-value="growing">Growing / Young</button>
+                  <button class="profile-btn" data-value="idle">Idle / Retired</button>
+                </div>
+              </div>
+
+              <div class="profile-group">
+                <div class="profile-label">Health concerns <span class="profile-multi">(select all that apply)</span></div>
+                <div class="profile-options" data-group="health" data-multi="true">
+                  <button class="profile-btn" data-value="none">None known</button>
+                  <button class="profile-btn" data-value="ir">Insulin resistance / EMS</button>
+                  <button class="profile-btn" data-value="laminitis">Laminitis / Founder history</button>
+                  <button class="profile-btn" data-value="cushings">Cushing's / PPID</button>
+                  <button class="profile-btn" data-value="pssm">PSSM / Tying-up</button>
+                  <button class="profile-btn" data-value="ulcers">Ulcers / Digestive issues</button>
+                  <button class="profile-btn" data-value="hoof">Hoof quality issues</button>
+                  <button class="profile-btn" data-value="weight_loss">Hard keeper / Underweight</button>
+                </div>
+              </div>
+
+              <div class="profile-group">
+                <div class="profile-label">Body condition</div>
+                <div class="profile-options" data-group="condition">
+                  <button class="profile-btn" data-value="thin">Thin / Needs weight</button>
+                  <button class="profile-btn" data-value="ideal">Ideal weight</button>
+                  <button class="profile-btn" data-value="overweight">Overweight / Easy keeper</button>
+                </div>
+              </div>
+
+              <div class="profile-group">
+                <div class="profile-label">Forage access</div>
+                <div class="profile-options" data-group="forage">
+                  <button class="profile-btn" data-value="pasture">Fresh pasture daily</button>
+                  <button class="profile-btn" data-value="hay_pasture">Hay + some pasture</button>
+                  <button class="profile-btn" data-value="hay_only">Hay only</button>
+                  <button class="profile-btn" data-value="limited">Limited / Restricted</button>
+                </div>
+              </div>
+
+            </div>
+          </div>
+
           <div class="decoder-actions">
             <button class="btn btn-primary btn-full" id="decodeBtn">Decode This Label</button>
             <div class="decoder-actions-row2">
@@ -166,6 +224,15 @@
               <h4>Questions to Ask</h4>
               <div class="out-content" id="oc-missing"></div>
             </div>
+          </div>
+
+          <!-- PERSONALIZED HORSE SUMMARY -->
+          <div class="horse-summary-block" id="horseSummaryBlock" style="display:none;">
+            <div class="horse-summary-header">
+              <span>&#128014;</span>
+              <h4>For Your Horse</h4>
+            </div>
+            <div class="out-content" id="oc-horse-summary"></div>
           </div>
 
           <div class="summary-block">

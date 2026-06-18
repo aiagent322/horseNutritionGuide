@@ -656,3 +656,160 @@ ul li { margin-bottom: 0.35rem; }
   .scan-progress-fill { transition: none; }
   .btn { transition: none; }
 }
+
+/* ============================================
+   HORSE PROFILE — question panel
+   ============================================ */
+
+.horse-profile {
+  background: #F2F7F4;
+  border-top: 1px solid var(--cream-dark);
+  padding: 20px 20px 16px;
+}
+
+.profile-header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 16px;
+  flex-wrap: wrap;
+}
+
+.profile-icon { font-size: 1.3rem; }
+
+.profile-header strong {
+  font-size: 0.95rem;
+  color: var(--green-deep);
+}
+
+.profile-sub {
+  font-size: 0.8rem;
+  color: var(--text-light);
+}
+
+.profile-grid {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.profile-group {}
+
+.profile-label {
+  font-size: 0.78rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--text-light);
+  margin-bottom: 8px;
+}
+
+.profile-multi {
+  font-weight: 400;
+  text-transform: none;
+  letter-spacing: 0;
+  font-size: 0.76rem;
+  color: var(--text-light);
+}
+
+.profile-options {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.profile-btn {
+  font-family: var(--font-body);
+  font-size: 0.83rem;
+  font-weight: 500;
+  padding: 8px 14px;
+  border-radius: 20px;
+  border: 1.5px solid var(--cream-dark);
+  background: var(--white);
+  color: var(--text-mid);
+  cursor: pointer;
+  transition: all 0.15s;
+  -webkit-tap-highlight-color: transparent;
+  min-height: 36px;
+}
+
+.profile-btn:hover {
+  border-color: var(--green-light);
+  color: var(--green-deep);
+}
+
+.profile-btn.selected {
+  background: var(--green-deep);
+  border-color: var(--green-deep);
+  color: var(--white);
+  font-weight: 600;
+}
+
+.profile-btn.selected-caution {
+  background: var(--caution);
+  border-color: var(--caution);
+  color: var(--white);
+  font-weight: 600;
+}
+
+/* ── For Your Horse summary block */
+.horse-summary-block {
+  background: linear-gradient(135deg, #1C3A2F 0%, #2D5C47 100%);
+  border-radius: var(--radius);
+  padding: 24px 20px;
+  margin-bottom: 14px;
+  border: none;
+}
+
+.horse-summary-header {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 14px;
+}
+
+.horse-summary-header span { font-size: 1.4rem; }
+
+.horse-summary-header h4 {
+  font-family: var(--font-body);
+  font-weight: 700;
+  font-size: 0.82rem;
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+  color: var(--amber-light);
+  margin: 0;
+}
+
+.horse-summary-block .out-content {
+  color: rgba(248,244,238,0.92);
+  font-size: 0.95rem;
+  line-height: 1.7;
+}
+
+.horse-summary-block .out-content strong {
+  color: var(--cream);
+}
+
+.horse-summary-block .hs-flag {
+  background: rgba(255,255,255,0.08);
+  border-left: 3px solid var(--amber-light);
+  border-radius: 0 6px 6px 0;
+  padding: 10px 14px;
+  margin: 10px 0;
+  font-size: 0.88rem;
+}
+
+.horse-summary-block .hs-flag.hs-caution {
+  border-left-color: #FF8C69;
+  background: rgba(255,100,50,0.12);
+}
+
+.horse-summary-block .hs-flag.hs-ok {
+  border-left-color: #7EC89A;
+  background: rgba(100,200,130,0.10);
+}
+
+.horse-summary-block .hs-flag.hs-warn {
+  border-left-color: #FFD166;
+  background: rgba(255,200,50,0.10);
+}

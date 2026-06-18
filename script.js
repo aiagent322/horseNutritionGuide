@@ -2396,3 +2396,316 @@ document.addEventListener('DOMContentLoaded', function () {
   });
 
 })();
+
+// ─────────────────────────────────────────────
+// HORSE PROFILE — selection UI + personalized summary
+// ─────────────────────────────────────────────
+(function () {
+  'use strict';
+
+  // ── Collect current profile selections
+  function getProfile() {
+    const profile = {};
+    document.querySelectorAll('.profile-options[data-group]').forEach(function (group) {
+      const key      = group.getAttribute('data-group');
+      const isMulti  = group.getAttribute('data-multi') === 'true';
+      const selected = Array.from(group.querySelectorAll('.profile-btn.selected, .profile-btn.selected-caution'))
+                            .map(function (b) { return b.getAttribute('data-value'); });
+      profile[key] = isMulti ? selected : (selected[0] || null);
+    });
+    return profile;
+  }
+
+  // ── Generate personalized "For Your Horse" summary
+  function buildHorseSummary(profile, decoderResult, rawText) {
+    // Pull key values from the decoder result text content
+    const use       = profile.use       || 'pleasure';
+    const health    = profile.health    || [];
+    const condition = profile.condition || 'ideal';
+    const forage    = profile.forage    || 'hay_only';
+
+    // Detect what we know about the feed from the raw label
+    const lower = rawText ? rawText.toLowerCase() : '';
+
+    // NSC situation
+    const nscMatch     = rawText ? rawText.match(/nsc[^0-9]{0,30}([0-9]+\.?[0-9]*)\s*%/i) : null;
+    const sugarMatch   = rawText ? rawText.match(/(?:sugar|wsc)[^0-9]{0,30}([0-9]+\.?[0-9]*)\s*%/i) : null;
+    const starchMatch  = rawText ? rawText.match(/starch[^0-9]{0,30}([0-9]+\.?[0-9]*)\s*%/i) : null;
+    const nscVal       = nscMatch ? parseFloat(nscMatch[1]) : null;
+    const calcNSC      = (sugarMatch && starchMatch) ? parseFloat(sugarMatch[1]) + parseFloat(starchMatch[1]) : null;
+    const effectiveNSC = nscVal || calcNSC;
+
+    const hasMolasses  = /molasses/i.test(lower);
+    const hasGrainLead = /corn|oats|barley|maize/.test((lower.split(',').slice(0,3).join(',')));
+    const hasFiberLead = /beet pulp|soybean hull|alfalfa/.test((lower.split(',').slice(0,3).join(',')));
+    const hasProbiotic = /lactobacillus|saccharomyces|yeast culture/i.test(lower);
+    const hasBiotin    = /biotin/i.test(lower);
+    const isHighFiber  = /crude fiber[^0-9]{0,30}([0-9]+)/.test(rawText || '') && 
+                         parseFloat((rawText||'').match(/crude fiber[^0-9]{0,30}([0-9]+\.?[0-9]*)/i)?.[1]||0) >= 15;
+    const isSeniorFeed = /senior/i.test(lower);
+    const isCompleteFeed = /complete feed/i.test(lower);
+
+    const hasIR        = health.includes('ir') || health.includes('laminitis') || health.includes('cushings');
+    const hasPSSM      = health.includes('pssm');
+    const hasUlcers    = health.includes('ulcers');
+    const hasHoofIssue = health.includes('hoof');
+    const isHardKeeper = condition === 'thin' || health.includes('weight_loss');
+    const isEasyKeeper = condition === 'overweight';
+    const hasPasture   = forage === 'pasture' || forage === 'hay_pasture';
+    const isLimitedForage = forage === 'limited';
+
+    const flags = [];
+    const lines = [];
+
+    // ── Opening line — address the horse directly
+    const useLabels = {
+      pleasure:    'trail or pleasure horse',
+      performance: 'performance horse',
+      senior:      'senior horse',
+      breeding:    'broodmare or breeding horse',
+      growing:     'young or growing horse',
+      idle:        'retired or idle horse'
+    };
+    const useLabel = useLabels[use] || 'horse';
+
+    lines.push(`Here is what this feed means for your <strong>${useLabel}</strong>:`);
+
+    // ── METABOLIC / IR / LAMINITIS / CUSHINGS
+    if (hasIR) {
+      if (effectiveNSC !== null) {
+        if (effectiveNSC > 12) {
+          flags.push({ type: 'caution', text: `NSC is approximately ${effectiveNSC}% — above the recommended 10–12% threshold for insulin-resistant and laminitis-risk horses. <strong>This feed is likely not appropriate for your horse without veterinary approval.</strong>` });
+        } else if (effectiveNSC <= 10) {
+          flags.push({ type: 'ok', text: `NSC appears to be ${effectiveNSC}% — within the commonly recommended range for metabolic horses. Still verify with your vet and confirm the tested (not calculated) NSC value before feeding.` });
+        } else {
+          flags.push({ type: 'warn', text: `NSC appears to be ${effectiveNSC}% — borderline for a horse with insulin resistance or laminitis history. Discuss with your vet before feeding.` });
+        }
+      } else if (hasGrainLead) {
+        flags.push({ type: 'caution', text: `Grain ingredients appear near the top of the ingredient list, and NSC is not listed. For a horse with insulin resistance, Cushing\'s, or laminitis history, <strong>do not feed this without getting the NSC value from the manufacturer first.</strong>` });
+      } else if (hasFiberLead) {
+        flags.push({ type: 'warn', text: `Fiber ingredients lead the list, which is a positive sign for a metabolic horse — but NSC is not listed. Ask the manufacturer for the tested NSC, sugar, and starch values before feeding.` });
+      } else {
+        flags.push({ type: 'caution', text: `Your horse has metabolic concerns but NSC, sugar, and starch values are not on this label. <strong>Do not feed without getting these numbers from the manufacturer.</strong>` });
+      }
+      if (hasMolasses) {
+        flags.push({ type: 'caution', text: `Molasses is present in the ingredient list — an added sugar that is generally not recommended for horses with insulin resistance, EMS, Cushing\'s, or laminitis history.` });
+      }
+    }
+
+    // ── PSSM / TYING-UP
+    if (hasPSSM) {
+      if (hasGrainLead) {
+        flags.push({ type: 'caution', text: `Horses with PSSM or recurring tying-up require very low starch and sugar. Grain ingredients appear near the top of this label. <strong>This feed is likely not appropriate for your horse</strong> — discuss with your vet before feeding.` });
+      } else if (effectiveNSC !== null && effectiveNSC > 10) {
+        flags.push({ type: 'caution', text: `PSSM and tying-up horses typically need NSC below 10%. This feed appears to be approximately ${effectiveNSC}% NSC. Discuss with your vet or equine nutritionist.` });
+      } else if (hasFiberLead && (effectiveNSC === null || effectiveNSC <= 10)) {
+        flags.push({ type: 'ok', text: `Fiber ingredients lead the list${effectiveNSC ? ` and NSC appears to be ${effectiveNSC}%` : ''} — a potentially suitable profile for a PSSM or tying-up horse. Confirm NSC with the manufacturer and discuss with your vet.` });
+      }
+    }
+
+    // ── SENIOR HORSE
+    if (use === 'senior' || isSeniorFeed) {
+      const cpMatch = rawText ? rawText.match(/crude protein[^0-9]{0,30}([0-9]+\.?[0-9]*)\s*%/i) : null;
+      const cpVal   = cpMatch ? parseFloat(cpMatch[1]) : null;
+      if (isCompleteFeed || isHighFiber) {
+        flags.push({ type: 'ok', text: `This appears to be a complete or high-fiber feed — appropriate for a senior horse with reduced ability to chew long-stem hay. Make sure it is introduced gradually and fed in multiple small meals.` });
+      }
+      if (cpVal !== null && cpVal < 12) {
+        flags.push({ type: 'warn', text: `Crude protein is ${cpVal}% — on the lower end for a senior horse. Older horses are less efficient at digesting protein, and most equine nutritionists recommend at least 12–14% crude protein for senior horses to maintain muscle mass.` });
+      }
+      if (cpVal !== null && cpVal >= 14) {
+        flags.push({ type: 'ok', text: `Crude protein is ${cpVal}% — a good level for a senior horse. Higher protein helps compensate for reduced digestive efficiency as horses age.` });
+      }
+    }
+
+    // ── PERFORMANCE HORSE
+    if (use === 'performance') {
+      const fatMatch = rawText ? rawText.match(/crude fat[^0-9]{0,30}([0-9]+\.?[0-9]*)\s*%/i) : null;
+      const fatVal   = fatMatch ? parseFloat(fatMatch[1]) : null;
+      if (fatVal !== null && fatVal >= 8) {
+        flags.push({ type: 'ok', text: `Crude fat is ${fatVal}% — a good energy source for a performance horse. Fat provides sustained energy without the starch spike that grain-heavy feeds can cause.` });
+      } else if (fatVal !== null && fatVal < 5) {
+        flags.push({ type: 'warn', text: `Crude fat is only ${fatVal}%. For a horse in heavy work, consider whether this feed provides enough caloric density, or whether fat supplementation (rice bran, oil) is needed.` });
+      }
+      if (hasProbiotic) {
+        flags.push({ type: 'ok', text: `Digestive support ingredients are present — beneficial for a performance horse under the stress of heavy training and travel.` });
+      }
+    }
+
+    // ── HARD KEEPER / UNDERWEIGHT
+    if (isHardKeeper) {
+      const fatMatch = rawText ? rawText.match(/crude fat[^0-9]{0,30}([0-9]+\.?[0-9]*)\s*%/i) : null;
+      const fatVal   = fatMatch ? parseFloat(fatMatch[1]) : null;
+      if (fatVal !== null && fatVal >= 8) {
+        flags.push({ type: 'ok', text: `With ${fatVal}% crude fat, this feed has meaningful caloric density — good for a horse that needs to gain weight. Fat adds calories without increasing starch.` });
+      } else if (fatVal !== null && fatVal < 5) {
+        flags.push({ type: 'warn', text: `Crude fat is ${fatVal}% — relatively low for a hard keeper. For weight gain, look for feeds with 8%+ fat, or consider adding a fat supplement such as stabilized rice bran or vegetable oil.` });
+      }
+    }
+
+    // ── EASY KEEPER / OVERWEIGHT
+    if (isEasyKeeper) {
+      if (effectiveNSC !== null && effectiveNSC > 15) {
+        flags.push({ type: 'caution', text: `Your horse is an easy keeper and this feed appears to be ${effectiveNSC}% NSC. High-calorie feeds are generally not appropriate for overweight horses — consider a ration balancer paired with quality hay instead.` });
+      } else if (hasFiberLead) {
+        flags.push({ type: 'ok', text: `Fiber-based energy is more appropriate for an easy keeper than grain starch. However, even fiber-based feeds add calories — monitor body condition and adjust feeding rate accordingly.` });
+      }
+    }
+
+    // ── ULCERS / DIGESTIVE ISSUES
+    if (hasUlcers) {
+      if (hasProbiotic) {
+        flags.push({ type: 'ok', text: `Digestive support ingredients (yeast culture, probiotics) are present — beneficial for a horse with ulcer or digestive history.` });
+      } else {
+        flags.push({ type: 'warn', text: `No digestive support ingredients detected. For a horse with ulcer or digestive history, feeds with added yeast culture, probiotics, or prebiotics are generally preferred. Ask the manufacturer or discuss with your vet.` });
+      }
+      if (hasGrainLead) {
+        flags.push({ type: 'warn', text: `Grain-forward feeds can contribute to hindgut acidosis and may aggravate ulcer-prone horses. Consider whether a fiber-forward or lower-starch option would be more suitable.` });
+      }
+    }
+
+    // ── HOOF ISSUES
+    if (hasHoofIssue) {
+      if (hasBiotin) {
+        flags.push({ type: 'ok', text: `Biotin is present — research supports biotin supplementation for horses with poor hoof quality. Visible improvement in new hoof growth typically takes 6–12 months.` });
+      } else {
+        flags.push({ type: 'warn', text: `No biotin detected in this feed. For a horse with hoof quality issues, biotin supplementation (15–20 mg/day) is well-supported by research. Ask whether this feed contains biotin or consider a targeted supplement.` });
+      }
+    }
+
+    // ── VITAMIN E — pasture vs no pasture
+    const vitEMatch = rawText ? rawText.match(/vitamin\s*e[^0-9]{0,30}([0-9]+\.?[0-9]*)\s*iu/i) : null;
+    const vitEVal   = vitEMatch ? parseFloat(vitEMatch[1]) : null;
+    if (!hasPasture && vitEVal !== null && vitEVal < 200) {
+      flags.push({ type: 'warn', text: `Your horse has limited pasture access and Vitamin E is listed at only ${vitEVal} IU/lb. Without fresh grass, horses frequently become Vitamin E deficient. Consider additional supplementation — especially important for horses with muscle or neurological conditions.` });
+    } else if (!hasPasture && vitEVal !== null && vitEVal >= 200) {
+      flags.push({ type: 'ok', text: `Vitamin E is listed at ${vitEVal} IU/lb. For a horse without regular pasture access, this is a meaningful amount — but verify total daily intake against your horse\'s body weight and health needs.` });
+    } else if (hasPasture && vitEVal !== null) {
+      flags.push({ type: 'ok', text: `Your horse has pasture access, which is the best natural source of Vitamin E. The ${vitEVal} IU/lb in this feed provides additional support.` });
+    }
+
+    // ── GROWING HORSE
+    if (use === 'growing') {
+      const cpMatch = rawText ? rawText.match(/crude protein[^0-9]{0,30}([0-9]+\.?[0-9]*)\s*%/i) : null;
+      const cpVal   = cpMatch ? parseFloat(cpMatch[1]) : null;
+      if (cpVal !== null && cpVal >= 14) {
+        flags.push({ type: 'ok', text: `Crude protein is ${cpVal}% — appropriate for a growing horse. Young horses need more protein per pound of body weight than mature horses to support muscle and skeletal development.` });
+      } else if (cpVal !== null && cpVal < 14) {
+        flags.push({ type: 'warn', text: `Crude protein is ${cpVal}%. Growing horses typically need 14–16% crude protein. Ask whether this feed is formulated specifically for young horses, or whether a growth-specific feed would be more appropriate.` });
+      }
+    }
+
+    // ── BREEDING / PREGNANT
+    if (use === 'breeding') {
+      flags.push({ type: 'warn', text: `Pregnant and lactating mares have significantly elevated protein, energy, vitamin, and mineral requirements — especially in the last trimester and during lactation. Confirm this feed is appropriate for your mare\'s specific stage with your vet or equine nutritionist.` });
+    }
+
+    // ── LIMITED FORAGE
+    if (isLimitedForage) {
+      if (isCompleteFeed || isHighFiber) {
+        flags.push({ type: 'ok', text: `This appears to be a complete or high-fiber feed — designed to partially or fully replace hay. This may be appropriate for a horse with limited forage access, but confirm feeding rate with the manufacturer to ensure total fiber needs are met.` });
+      } else {
+        flags.push({ type: 'warn', text: `Your horse has limited forage access. If this feed is not a complete feed, make sure total fiber intake is being met through other sources. Horses need a minimum of 1–1.5% of their body weight in forage daily for gut health.` });
+      }
+    }
+
+    // ── If no specific flags generated
+    if (!flags.length) {
+      flags.push({ type: 'ok', text: `No major concerns detected for a ${useLabel} based on the information provided. Review the full breakdown below and share this label with your vet or equine nutritionist if you have any questions.` });
+    }
+
+    // ── Build HTML
+    const flagsHTML = flags.map(function (f) {
+      return `<div class="hs-flag hs-${f.type}">${f.text}</div>`;
+    }).join('');
+
+    return lines.join(' ') + flagsHTML;
+  }
+
+  // ── Wire profile buttons
+  document.addEventListener('DOMContentLoaded', function () {
+
+    // Single-select groups
+    document.querySelectorAll('.profile-options:not([data-multi]) .profile-btn').forEach(function (btn) {
+      btn.addEventListener('click', function () {
+        const group = this.closest('.profile-options');
+        group.querySelectorAll('.profile-btn').forEach(function (b) {
+          b.classList.remove('selected', 'selected-caution');
+        });
+        this.classList.add('selected');
+      });
+    });
+
+    // Multi-select groups (health concerns)
+    document.querySelectorAll('.profile-options[data-multi] .profile-btn').forEach(function (btn) {
+      btn.addEventListener('click', function () {
+        const isNone = this.getAttribute('data-value') === 'none';
+        const group  = this.closest('.profile-options');
+
+        if (isNone) {
+          // Deselect all others
+          group.querySelectorAll('.profile-btn').forEach(function (b) {
+            b.classList.remove('selected', 'selected-caution');
+          });
+          this.classList.add('selected');
+        } else {
+          // Deselect "none"
+          group.querySelectorAll('[data-value="none"]').forEach(function (b) {
+            b.classList.remove('selected');
+          });
+          // Toggle this button — caution style for health concerns
+          if (this.classList.contains('selected-caution')) {
+            this.classList.remove('selected-caution');
+          } else {
+            this.classList.add('selected-caution');
+          }
+        }
+      });
+    });
+
+    // Hook into decode button — generate horse summary after decode
+    const decodeBtn = document.getElementById('decodeBtn');
+    if (decodeBtn) {
+      decodeBtn.addEventListener('click', function () {
+        // Small delay to let main decoder render first
+        setTimeout(function () {
+          const profile  = getProfile();
+          const rawText  = (document.getElementById('feedInput') || {}).value || '';
+          const hasAnySelection = Object.values(profile).some(function (v) {
+            return v && (Array.isArray(v) ? v.length > 0 : true);
+          });
+
+          const block = document.getElementById('horseSummaryBlock');
+          const el    = document.getElementById('oc-horse-summary');
+          if (!block || !el) return;
+
+          if (hasAnySelection && rawText.trim().length > 20) {
+            el.innerHTML = buildHorseSummary(profile, null, rawText);
+            block.style.display = 'block';
+            // Scroll to it
+            setTimeout(function () {
+              block.scrollIntoView({ behavior: 'smooth', block: 'start' });
+            }, 300);
+          } else {
+            block.style.display = 'none';
+          }
+        }, 200);
+      }, true); // capture phase so we run after main decode
+    }
+
+    // Clear also resets horse summary
+    const origClear = document.getElementById('clearBtn');
+    if (origClear) {
+      origClear.addEventListener('click', function () {
+        const block = document.getElementById('horseSummaryBlock');
+        if (block) block.style.display = 'none';
+        // Deselect all profile buttons
+        document.querySelectorAll('.profile-btn').forEach(function (b) {
+          b.classList.remove('selected', 'selected-caution');
+        });
+      });
+    }
+
+  });
+
+})();
