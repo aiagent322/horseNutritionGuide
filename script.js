@@ -565,10 +565,12 @@ function decodeLabel(text) {
   if (analysis.fat) {
     const fatVal = analysis.fat.value;
     const fatNote = fatVal < 4
-      ? `Crude Fat: ${fatVal}% (min) — this is relatively low fat. Despite any "performance" positioning on the label, a low fat value means this feed is not a high-calorie fat-based feed.`
+      ? `Crude Fat: ${fatVal}% (min) — low fat. Despite any "performance" positioning on the label, this feed is not a fat-based energy feed.`
+      : fatVal >= 12
+      ? `Crude Fat: ${fatVal}% (min) — high fat formula. Provides concentrated energy without raising starch or sugar. Appropriate for hard keepers, performance horses, or horses needing calories without grain.`
       : fatVal >= 8
-      ? `Crude Fat: ${fatVal}% (min) — higher fat content, which provides concentrated energy without starch. Good for weight gain or high-energy needs.`
-      : `Crude Fat: ${fatVal}% (min).`;
+      ? `Crude Fat: ${fatVal}% (min) — moderate to higher fat. Adds caloric density but if the ingredient list includes significant grain (corn, oats, barley), energy is coming from both starch and fat. Not the same as a dedicated fat-supplement feed.`
+      : `Crude Fat: ${fatVal}% (min) — moderate fat level, typical of a mixed grain feed.`;
     anNotes.push(fatNote);
   }
   if (analysis.fiber)      anNotes.push(`Crude Fiber: ${analysis.fiber.value}% (max).`);
