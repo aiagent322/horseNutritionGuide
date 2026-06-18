@@ -219,46 +219,84 @@ This is a senior complete feed designed for horses with reduced ability to chew 
 // DECODER INGREDIENT SIGNALS
 // ─────────────────────────────────────────────
 const SIGNALS = {
+  // Fiber-based energy sources — matches categorizeIngredient 'fiber'
   fiberEnergy: [
-    'beet pulp', 'soybean hulls', 'alfalfa meal', 'dehydrated alfalfa', 'hay meal',
-    'oat hulls', 'alfalfa', 'soybean hull'
+    'beet pulp', 'soybean hulls', 'soybean hull', 'alfalfa meal', 'dehydrated alfalfa',
+    'dehydrated alfalfa meal', 'hay meal', 'timothy meal', 'grass meal',
+    'oat hulls', 'oat hull', 'oat fiber', 'oat straw', 'cottonseed hull',
+    'alfalfa', 'wheat bran', 'wheat middlings', 'wheat germ'
   ],
+  // Grain/starch primary sources — matches categorizeIngredient 'starch'
+  // NOTE: wheat middlings removed (now fiber), oat groats moved here as starch
   grainStarch: [
-    'corn', 'ground corn', 'flaked corn', 'steam-flaked corn', 'oats', 'ground oats',
-    'rolled oats', 'barley', 'wheat', 'wheat middlings', 'grain products',
-    'cereal grain', 'oat groats'
+    'corn', 'ground corn', 'flaked corn', 'steam-flaked corn', 'cracked corn',
+    'oats', 'ground oats', 'rolled oats', 'whole oats', 'oat groats',
+    'barley', 'rolled barley', 'wheat', 'milo', 'sorghum',
+    'grain products', 'cereal grain', 'maize'
   ],
+  // Fat sources — matches categorizeIngredient 'fat'
   fat: [
-    'rice bran', 'vegetable oil', 'soybean oil', 'flaxseed', 'linseed', 'stabilized fat',
-    'stabilized flaxseed', 'flax', 'canola oil', 'fat', 'fish oil'
+    'rice bran', 'stabilized rice bran', 'vegetable oil', 'soybean oil',
+    'canola oil', 'sunflower oil', 'fish oil', 'flaxseed', 'linseed',
+    'stabilized flaxseed', 'flax', 'animal fat', 'stabilized fat'
   ],
+  // Protein meal sources — matches categorizeIngredient 'protein'
+  // Amino acids (lysine, methionine, threonine) kept here — they are protein-quality signals
   protein: [
-    'soybean meal', 'canola meal', 'alfalfa meal', 'linseed meal', 'lysine',
-    'methionine', 'threonine', 'dehydrated alfalfa meal'
+    'soybean meal', 'canola meal', 'linseed meal', 'cottonseed meal', 'sunflower meal',
+    'corn gluten', 'brewers grain', 'distillers', 'ddgs',
+    'lysine', 'l-lysine', 'dl-methionine', 'methionine', 'threonine', 'l-threonine'
   ],
+  // Sugar and palatability sources
   sugar: [
-    'molasses', 'cane molasses', 'sugar', 'corn syrup', 'dextrose', 'sucrose'
+    'molasses', 'cane molasses', 'beet molasses', 'sugar', 'corn syrup',
+    'dextrose', 'sucrose', 'fructose'
   ],
+  // Macro and trace minerals
   minerals: [
-    'salt', 'sodium chloride', 'limestone', 'calcium carbonate', 'dicalcium phosphate',
-    'monocalcium phosphate', 'zinc', 'zinc sulfate', 'zinc proteinate',
-    'copper', 'copper sulfate', 'copper proteinate', 'manganese', 'selenium',
-    'selenium yeast', 'selenium proteinate', 'magnesium', 'magnesium oxide',
-    'potassium chloride', 'iodine', 'cobalt', 'iron'
+    'salt', 'sodium chloride', 'limestone', 'calcium carbonate',
+    'dicalcium phosphate', 'monocalcium phosphate', 'defluorinated phosphate',
+    'zinc sulfate', 'zinc proteinate', 'zinc amino acid chelate', 'zinc oxide',
+    'copper sulfate', 'copper proteinate', 'copper amino acid chelate',
+    'manganese sulfate', 'manganese amino acid chelate',
+    'selenium yeast', 'selenium proteinate', 'sodium selenite',
+    'magnesium oxide', 'magnesium sulfate',
+    'potassium chloride', 'ethylenediamine dihydriodide', 'cobalt sulfate',
+    'ferrous sulfate', 'iron amino acid chelate'
   ],
+  // Vitamins and B-complex
   vitamins: [
-    'vitamin a', 'vitamin d', 'vitamin d3', 'vitamin e', 'vitamin e supplement',
-    'biotin', 'thiamine', 'riboflavin', 'niacin', 'folic acid', 'vitamin b',
-    'choline', 'pyridoxine', 'cyanocobalamin'
+    'vitamin a supplement', 'vitamin a',
+    'vitamin d3 supplement', 'vitamin d3', 'vitamin d',
+    'vitamin e supplement', 'vitamin e',
+    'menadione', 'vitamin k',
+    'thiamine mononitrate', 'thiamine', 'riboflavin supplement', 'riboflavin',
+    'niacin supplement', 'niacin', 'folic acid', 'pyridoxine hydrochloride',
+    'cyanocobalamin', 'vitamin b12', 'choline chloride', 'choline',
+    'calcium pantothenate', 'biotin', 'd-biotin',
+    'dl-alpha tocopherol', 'd-alpha tocopherol'
   ],
+  // Digestive support — probiotics, prebiotics, yeast
   digestive: [
-    'yeast culture', 'probiotics', 'prebiotics', 'lactobacillus', 'saccharomyces',
-    'enterococcus', 'bifidobacterium', 'aspergillus', 'dried fermentation',
-    'yeast fermentation', 'mannan oligosaccharides', 'fructooligosaccharides'
+    'yeast culture', 'dried yeast', 'active dry yeast',
+    'saccharomyces cerevisiae', 'saccharomyces',
+    'lactobacillus acidophilus', 'lactobacillus brevis', 'lactobacillus plantarum',
+    'lactobacillus', 'enterococcus faecium', 'enterococcus',
+    'pediococcus acidilactici', 'pediococcus',
+    'bifidobacterium', 'bacillus subtilis',
+    'aspergillus oryzae', 'aspergillus niger', 'aspergillus',
+    'mannan oligosaccharides', 'fructooligosaccharides', 'inulin',
+    'dried fermentation product', 'fermentation product'
   ],
+  // Hoof, skin, coat support — ingredient-list only, not analysis panel
+  // zinc/copper removed — picked up from analysis numbers causing false positives
   hoofCoat: [
-    'biotin', 'flaxseed', 'linseed', 'omega', 'zinc', 'copper', 'methionine',
-    'dl-methionine', 'vegetable oil', 'flax'
+    'biotin', 'd-biotin',
+    'flaxseed', 'stabilized flaxseed', 'linseed', 'flax',
+    'fish oil', 'omega',
+    'dl-methionine', 'methionine',
+    'zinc amino acid chelate', 'zinc proteinate',
+    'copper amino acid chelate', 'copper proteinate'
   ]
 };
 
