@@ -1,0 +1,287 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>HorseNutritionGuide.com — What's Really in Your Horse Feed?</title>
+  <meta name="description" content="Standing in the feed store? Photo the label and instantly find out what's in the bag." />
+  <link rel="stylesheet" href="styles.css" />
+</head>
+<body>
+
+  <!-- HEADER — minimal, mobile-first -->
+  <header class="site-header">
+    <div class="container header-inner">
+      <a href="#" class="logo">
+        <span class="logo-mark">&#9670;</span>
+        HorseNutritionGuide<span class="logo-dot">.com</span>
+      </a>
+      <a href="#learn-more" class="header-link">Learn more</a>
+    </div>
+  </header>
+
+  <!-- MOBILE HERO — camera is the CTA -->
+  <section class="hero-mobile">
+    <div class="hero-mobile-inner">
+      <p class="hero-mobile-eyebrow">Standing in the feed store?</p>
+      <h1 class="hero-mobile-headline">What's Really in<br>That Bag?</h1>
+      <p class="hero-mobile-sub">Photo the label. Get instant plain-English answers.</p>
+
+      <!-- THE MAIN ACTION -->
+      <label class="camera-cta" for="ocrFileInput" id="cameraCTA">
+        <span class="camera-icon">&#128247;</span>
+        <span class="camera-label">Photo the Feed Label</span>
+        <span class="camera-sub">Tap to open your camera</span>
+        <input type="file" id="ocrFileInput" accept="image/*" capture="environment" style="display:none;" />
+      </label>
+
+      <p class="hero-mobile-trust">Free &middot; No login &middot; Educational use only</p>
+    </div>
+  </section>
+
+  <!-- OCR STATUS + PREVIEW (shown after photo taken) -->
+  <section class="scan-section" id="scanSection" style="display:none;">
+    <div class="container">
+
+      <div class="scan-preview-wrap" id="scanPreviewWrap">
+        <img id="ocrPreviewImg" class="scan-preview-img" alt="Feed label photo" />
+        <button class="scan-remove-btn" id="ocrRemoveBtn">&#10005; Use a different photo</button>
+      </div>
+
+      <div class="scan-status" id="ocrStatus" style="display:none;">
+        <div class="scan-spinner"></div>
+        <div>
+          <div class="scan-status-text" id="ocrStatusText">Reading label…</div>
+          <div class="scan-progress-wrap" id="ocrProgressWrap" style="display:none;">
+            <div class="scan-progress-bar">
+              <div class="scan-progress-fill" id="ocrProgressFill" style="width:0%"></div>
+            </div>
+            <div class="scan-progress-label" id="ocrProgressLabel">0%</div>
+          </div>
+        </div>
+      </div>
+
+      <button class="btn btn-primary btn-full" id="ocrScanBtn" style="display:none;">Read This Label</button>
+
+      <div class="scan-result-msg" id="ocrResultMsg" style="display:none;">
+        <span>&#10003;</span> Label read. Scroll down to see your breakdown — or edit the text below first.
+      </div>
+
+      <div class="scan-error-msg" id="ocrErrorMsg" style="display:none;">
+        <span>&#9888;</span> <span id="ocrErrorText"></span>
+      </div>
+
+    </div>
+  </section>
+
+  <!-- DECODER TOOL -->
+  <section class="decoder-section" id="decoder">
+    <div class="container">
+
+      <div class="decoder-card">
+
+        <!-- Extracted text review -->
+        <div class="decoder-input-area" id="textInputArea">
+          <label for="feedInput" class="input-label">Label Text <span class="input-label-sub">— review &amp; edit if needed</span></label>
+          <textarea id="feedInput" class="feed-textarea" placeholder="Label text will appear here after scanning. You can also type it in manually."></textarea>
+          <div class="decoder-actions">
+            <button class="btn btn-primary btn-full" id="decodeBtn">Decode This Label</button>
+            <div class="decoder-actions-row2">
+              <button class="btn btn-secondary" id="exampleBtn">Try an Example</button>
+              <button class="btn btn-ghost" id="clearBtn">Clear</button>
+            </div>
+          </div>
+        </div>
+
+        <!-- OUTPUT -->
+        <div class="decoder-output" id="decoderOutput" style="display:none;">
+          <div class="output-header">
+            <h2>Your Feed Breakdown</h2>
+            <p class="output-note">Educational only — not veterinary advice.</p>
+          </div>
+
+          <div class="output-grid">
+            <div class="output-card highlight-card">
+              <div class="out-card-icon">&#9670;</div>
+              <h4>Feed Type</h4>
+              <div class="out-content" id="oc-feedtype"></div>
+            </div>
+
+            <div class="output-card">
+              <div class="out-card-icon">&#9889;</div>
+              <h4>Energy Sources</h4>
+              <div class="out-content" id="oc-energy"></div>
+            </div>
+
+            <div class="output-card">
+              <div class="out-card-icon">&#9650;</div>
+              <h4>Protein Sources</h4>
+              <div class="out-content" id="oc-protein"></div>
+            </div>
+
+            <div class="output-card">
+              <div class="out-card-icon">&#9632;</div>
+              <h4>Fiber Sources</h4>
+              <div class="out-content" id="oc-fiber"></div>
+            </div>
+
+            <div class="output-card">
+              <div class="out-card-icon">&#9679;</div>
+              <h4>Fat Sources</h4>
+              <div class="out-content" id="oc-fat"></div>
+            </div>
+
+            <div class="output-card caution-card">
+              <div class="out-card-icon">&#9888;</div>
+              <h4>Sugar &amp; Starch</h4>
+              <div class="out-content" id="oc-sugar"></div>
+            </div>
+
+            <div class="output-card">
+              <div class="out-card-icon">&#10022;</div>
+              <h4>Vitamins &amp; Minerals</h4>
+              <div class="out-content" id="oc-vitamins"></div>
+            </div>
+
+            <div class="output-card">
+              <div class="out-card-icon">&#8635;</div>
+              <h4>Digestive Support</h4>
+              <div class="out-content" id="oc-digestive"></div>
+            </div>
+
+            <div class="output-card">
+              <div class="out-card-icon">&#9670;</div>
+              <h4>Hoof, Skin &amp; Coat</h4>
+              <div class="out-content" id="oc-hoof"></div>
+            </div>
+
+            <div class="output-card">
+              <div class="out-card-icon">&#9998;</div>
+              <h4>Guaranteed Analysis</h4>
+              <div class="out-content" id="oc-analysis"></div>
+            </div>
+
+            <div class="output-card ask-card">
+              <div class="out-card-icon">?</div>
+              <h4>Questions to Ask</h4>
+              <div class="out-content" id="oc-missing"></div>
+            </div>
+          </div>
+
+          <div class="summary-block">
+            <h4>Plain-English Summary</h4>
+            <div class="out-content" id="oc-summary"></div>
+          </div>
+
+          <div class="vet-block">
+            <div class="vet-icon">&#9673;</div>
+            <div>
+              <h4>When to Call Your Vet</h4>
+              <div class="out-content" id="oc-vet"></div>
+            </div>
+          </div>
+
+          <!-- Scan another -->
+          <div class="scan-again-wrap">
+            <label class="btn btn-secondary btn-full" for="ocrFileInput2">
+              &#128247; Scan Another Label
+              <input type="file" id="ocrFileInput2" accept="image/*" capture="environment" style="display:none;" />
+            </label>
+          </div>
+        </div>
+
+      </div>
+    </div>
+  </section>
+
+  <!-- LEARN MORE / ABOUT -->
+  <section class="learn-more" id="learn-more">
+    <div class="container">
+      <div class="section-eyebrow">How It Works</div>
+      <h2 class="section-title">Your In-Store Feed Advisor</h2>
+      <p>Standing in front of a wall of feed bags, trying to figure out which one is right for your horse? HorseNutritionGuide.com gives you a plain-English breakdown of any label in seconds — right from your phone.</p>
+
+      <div class="how-grid">
+        <div class="how-step">
+          <div class="how-num">1</div>
+          <div>
+            <strong>Photo the label</strong>
+            <p>Point your phone at the ingredient list or guaranteed analysis panel and take a clear photo.</p>
+          </div>
+        </div>
+        <div class="how-step">
+          <div class="how-num">2</div>
+          <div>
+            <strong>Get your breakdown</strong>
+            <p>The tool reads the label and explains what every ingredient does and what the numbers mean.</p>
+          </div>
+        </div>
+        <div class="how-step">
+          <div class="how-num">3</div>
+          <div>
+            <strong>Ask better questions</strong>
+            <p>Walk out knowing exactly what to discuss with your vet or equine nutritionist.</p>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- INGREDIENT LIBRARY -->
+  <section class="ingredient-library" id="ingredient-library">
+    <div class="container">
+      <div class="section-eyebrow">Reference Guide</div>
+      <h2 class="section-title">Common Feed Ingredients Explained</h2>
+      <p class="section-sub">What you'll commonly see on a horse feed label — what it is, and why it's there.</p>
+      <div class="ingredient-grid" id="ingredientGrid"></div>
+    </div>
+  </section>
+
+  <!-- GUARANTEED ANALYSIS GUIDE -->
+  <section class="analysis-guide" id="analysis-guide">
+    <div class="container">
+      <div class="section-eyebrow">Label Literacy</div>
+      <h2 class="section-title">Understanding the Guaranteed Analysis</h2>
+      <p class="section-sub">Every commercial horse feed must include this panel. Here's what each number means.</p>
+      <div class="analysis-grid" id="analysisGrid"></div>
+    </div>
+  </section>
+
+  <!-- DISCLAIMER -->
+  <section class="disclaimer" id="disclaimer">
+    <div class="container">
+      <div class="disclaimer-inner">
+        <div class="disclaimer-icon">&#9888;</div>
+        <div>
+          <h3>Educational Tool — Not Veterinary Advice</h3>
+          <p>This tool interprets label text only. It does not diagnose, treat, or prescribe. Always consult a licensed veterinarian or qualified equine nutritionist for horses with:</p>
+          <ul>
+            <li>Laminitis or founder history</li>
+            <li>Insulin resistance (IR), EMS, or PPID/Cushing's</li>
+            <li>Colic symptoms or history</li>
+            <li>Rapid or unexplained weight change</li>
+            <li>Dental problems or choke risk</li>
+            <li>Tying-up / PSSM / EPSM</li>
+          </ul>
+          <p>No feed brand is endorsed or criticized. Assessments are based solely on label text provided.</p>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- FOOTER -->
+  <footer class="site-footer">
+    <div class="container footer-inner">
+      <div class="footer-brand">
+        <span class="logo-mark">&#9670;</span>
+        HorseNutritionGuide<span class="logo-dot">.com</span>
+      </div>
+      <p class="footer-note">Educational tool for horse owners. Not veterinary advice. Not affiliated with any feed manufacturer.</p>
+      <p class="footer-copy">&copy; 2025 HorseNutritionGuide.com</p>
+    </div>
+  </footer>
+
+  <script src="https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.min.js"></script>
+  <script src="script.js"></script>
+</body>
+</html>
