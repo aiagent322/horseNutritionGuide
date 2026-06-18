@@ -577,9 +577,14 @@ function decodeLabel(text) {
 
   if (analysis.calcium && analysis.phosphorus) {
     const ratio = (analysis.calcium.value / analysis.phosphorus.value).toFixed(1);
-    const ratioNote = parseFloat(ratio) < 1.5
-      ? `Ca:P ratio is approximately ${ratio}:1 — this is below the recommended 1.5–2:1 range. In the context of the horse's total diet (including hay), this should be reviewed.`
-      : `Ca:P ratio is approximately ${ratio}:1 — within the generally recommended 1.5–2:1 range. Note: this reflects the feed only, not your horse's total diet including hay.`;
+    const ratioFloat = parseFloat(ratio);
+    const ratioNote = ratioFloat < 1.5
+      ? `Ca:P ratio is approximately ${ratio}:1 — below the recommended 1.5–2:1 range. This should be reviewed in the context of the horse's total diet including hay.`
+      : ratioFloat <= 1.6
+      ? `Ca:P ratio is approximately ${ratio}:1 — at the low end of the recommended 1.5–2:1 range. Acceptable, but worth monitoring in the total diet context including hay.`
+      : ratioFloat <= 2.0
+      ? `Ca:P ratio is approximately ${ratio}:1 — within the recommended 1.5–2:1 range. Note: this reflects the feed only, not your horse's total diet including hay.`
+      : `Ca:P ratio is approximately ${ratio}:1 — above the recommended 1.5–2:1 range. High calcium relative to phosphorus is common in alfalfa-heavy feeds and is generally safe but worth noting.`;
     anNotes.push(ratioNote);
   }
 
