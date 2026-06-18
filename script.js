@@ -302,30 +302,132 @@ function ul(items) {
 // ─────────────────────────────────────────────
 function classifyFeedType(text) {
   const lower = textLower(text);
-
   const types = [];
 
-  if (/\bsenior\b/.test(lower)) types.push({ label: 'Senior Feed', confidence: 'high', reason: '"Senior" appears in the label text, suggesting this feed is formulated for older horses with reduced digestive efficiency or dental limitations.' });
-  if (/ration\s*balancer/.test(lower)) types.push({ label: 'Ration Balancer', confidence: 'high', reason: '"Ration balancer" appears in the label. These are low-feeding-rate concentrates designed to provide vitamins, minerals, and protein when fed alongside quality forage.' });
-  if (/complete\s*feed/.test(lower)) types.push({ label: 'Complete Feed', confidence: 'high', reason: '"Complete feed" appears in the label. These are designed to partially or fully replace hay and are common for horses with poor dentition.' });
+  // ── Extract ingredient text for pattern detection
+  const ingSection = (() => {
+    const m = text.match(/ingredients\s*:([\s\S]*?)(?=guaranteed\s*analysis|feeding\s*directions|important:|$)/i);
+    return m ? m[1].toLowerCase() : lower;
+  })();
+
+  // ── Extract crude fiber value if present
+  const fiberMatch = text.match(/crude\s*fiber[^0-9]*([0-9]+\.?[0-9]*)\s*%/i);
+  const crudeFiberPct = fiberMatch ? parseFloat(fiberMatch[1]) : null;
+
+  // ── Extract ADF/NDF values if present (high ADF/NDF = forage-replacing)
+  const adfMatch = text.match(/\badf\b[^0-9]*([0-9]+\.?[0-9]*)\s*%/i);
+  const ndfMatch = text.match(/\bndf\b[^0-9]*([0-9]+\.?[0-9]*)\s*%/i);
+  const adfVal = adfMatch ? parseFloat(adfMatch[1]) : null;
+  const ndfVal = ndfMatch ? parseFloat(ndfMatch[1]) : null;
+
+  // ── Count fiber-forward ingredients in ingredient section
+  const completeFeedFiberIngredients = [
+    'beet pulp','soybean hull','alfalfa meal','dehydrated alfalfa','hay meal',
+    'oat hull','oat fiber','wheat straw','oat straw','timothy meal','grass meal'
+  ];
+  const fiberIngCount = completeFeedFiberIngredients.filter(t => ingSection.includes(t)).length;
+
+  // ── Check feeding directions for hay-replacement language
+  const hayReplaceLanguage = /(replace\s*hay|hay\s*replace|without\s*hay|no\s*hay|forage\s*replace|can\s*be\s*fed\s*without|replace\s*forage|hay\s*free|dentition|poor\s*teeth|chew)/i.test(text);
+
+  // ── KEYWORD-BASED: highest confidence — explicit label claims
+  if (/\bcomplete\s*feed\b/i.test(text)) {
+    types.push({
+      label: 'Complete Feed',
+      confidence: 'high',
+      reason: '"Complete feed" appears on the label. These are formulated to partially or fully replace hay and are often used for horses with poor dentition, limited hay access, or senior horses.'
+    });
+  }
+
+  if (/\bsenior\b/i.test(text)) {
+    types.push({
+      label: 'Senior Feed',
+      confidence: 'high',
+      reason: '"Senior" appears on the label, suggesting this feed is formulated for older horses with reduced digestive efficiency, dental limitations, or both. Senior feeds are often higher in fiber and easier to chew.'
+    });
+  }
+
+  if (/ration\s*balancer/i.test(text)) {
+    types.push({
+      label: 'Ration Balancer',
+      confidence: 'high',
+      reason: '"Ration balancer" appears on the label. These are low-feeding-rate concentrates (typically 1–2 lbs/day) designed to supply vitamins, minerals, and protein when fed alongside quality forage. Not a calorie feed.'
+    });
+  }
+
+  // ── PATTERN-BASED: infer complete feed without keyword
+  if (!types.some(t => t.label === 'Complete Feed')) {
+    const completeFeedSignals = [];
+    if (crudeFiberPct !== null && crudeFiberPct >= 18) completeFeedSignals.push(`crude fiber ${crudeFiberPct}% (≥18% is a strong complete feed indicator)`);
+    if (fiberIngCount >= 2) completeFeedSignals.push(`${fiberIngCount} forage-type fiber ingredients detected (${completeFeedFiberIngredients.filter(t => ingSection.includes(t)).join(', ')})`);
+    if (hayReplaceLanguage) completeFeedSignals.push('feeding directions reference hay replacement or dental limitations');
+    if (adfVal !== null && adfVal >= 10) completeFeedSignals.push(`ADF ${adfVal}% suggests meaningful forage fiber content`);
+    if (ndfVal !== null && ndfVal >= 20) completeFeedSignals.push(`NDF ${ndfVal}% suggests forage-level fiber`);
+
+    if (completeFeedSignals.length >= 2) {
+      types.push({
+        label: 'Likely Complete or High-Fiber Feed',
+        confidence: 'medium',
+        reason: `"Complete feed" does not appear explicitly on this label, but multiple signals suggest it may be designed as a hay replacer or high-fiber feed: ${completeFeedSignals.join('; ')}.`
+      });
+    } else if (completeFeedSignals.length === 1 && (crudeFiberPct >= 18 || hayReplaceLanguage)) {
+      types.push({
+        label: 'Possibly Complete or High-Fiber Feed',
+        confidence: 'low',
+        reason: `One signal suggests this may be a complete or forage-replacing feed: ${completeFeedSignals[0]}. Confirm with the manufacturer whether this feed is intended to replace hay.`
+      });
+    }
+  }
 
   if (!types.length) {
-    const lsc = /(low[\s\-]starch|low[\s\-]sugar|low[\s\-]nsc|controlled[\s\-]starch|controlled[\s\-]carb)/i.test(lower);
-    const perf = /(performance|high[\s\-]fat|high[\s\-]calorie|show|endurance|sport)/i.test(lower);
+    // ── Low-starch / metabolic
+    const lsc = /(low[\s\-]starch|low[\s\-]sugar|low[\s\-]nsc|controlled[\s\-]starch|controlled[\s\-]carb|metabolic|founder|laminitis)/i.test(text);
+    const perf = /(performance|high[\s\-]fat|high[\s\-]calorie|show|endurance|sport|racing|eventing)/i.test(text);
 
-    const fiberCount = detectSignals(text, 'fiberEnergy').length;
-    const grainCount = detectSignals(text, 'grainStarch').length;
-    const vitCount   = detectSignals(text, 'vitamins').length;
-    const fatFound   = detectSignals(text, 'fat').length;
+    // Run signals only against ingredient section to avoid false positives
+    const ingForCount = completeFeedFiberIngredients.filter(t => ingSection.includes(t)).length;
+    const fiberCount  = detectSignals(ingSection, 'fiberEnergy').length;
+    const grainCount  = detectSignals(ingSection, 'grainStarch').length;
+    const vitCount    = detectSignals(text, 'vitamins').length;
 
-    if (lsc) types.push({ label: 'Low-Starch / Controlled-Carbohydrate Feed', confidence: 'high', reason: 'Language like "low starch," "low sugar," or "controlled starch" appears on the label, indicating this feed was formulated with metabolic or laminitis-risk horses in mind.' });
-    if (perf) types.push({ label: 'Performance / Weight-Gain Feed', confidence: 'medium', reason: 'Language associated with performance horses, high fat, or calorie density appears on the label.' });
+    if (lsc) types.push({
+      label: 'Low-Starch / Controlled-Carbohydrate Feed',
+      confidence: 'high',
+      reason: 'Language like "low starch," "low sugar," "controlled starch," or metabolic condition keywords appear on the label, indicating this feed was formulated with insulin-resistant or laminitis-risk horses in mind.'
+    });
+
+    if (perf) types.push({
+      label: 'Performance / Weight-Gain Feed',
+      confidence: 'medium',
+      reason: 'Language associated with performance horses, high fat, or calorie density appears on the label. These feeds are typically higher in energy for horses in heavy work.'
+    });
 
     if (!types.length) {
-      if (fiberCount >= 3 && grainCount <= 1) types.push({ label: 'Fiber-Forward Feed', confidence: 'medium', reason: `Multiple fiber-based ingredients were detected (${fiberCount} signals). This suggests a feed designed around digestible fiber energy rather than grain starch.` });
-      else if (grainCount >= 3) types.push({ label: 'Grain/Starch-Forward Feed', confidence: 'medium', reason: `Multiple grain or starch ingredients were detected (${grainCount} signals). This feed appears to use grain as a primary energy source.` });
-      else if (vitCount >= 4 && fiberCount <= 1 && grainCount <= 1) types.push({ label: 'Vitamin/Mineral Balancing Feed', confidence: 'medium', reason: 'Several vitamin and mineral sources were detected but fewer calorie-dense ingredients. This may be a supplement or balancer rather than a primary calorie feed.' });
-      else types.push({ label: 'General Purpose Feed', confidence: 'low', reason: 'Based on the pasted label text, this appears to be a mixed-use or general-purpose feed. Insufficient label keywords to narrow the classification further.' });
+      if (fiberCount >= 3 && grainCount <= 1) {
+        types.push({
+          label: 'Fiber-Forward Feed',
+          confidence: 'medium',
+          reason: `Multiple fiber-based ingredients detected (${fiberCount} signals). This feed appears to derive most of its energy from digestible fiber rather than grain starch — generally a safer choice for metabolic horses.`
+        });
+      } else if (grainCount >= 3) {
+        types.push({
+          label: 'Grain/Starch-Forward Feed',
+          confidence: 'medium',
+          reason: `Multiple grain or starch ingredients detected (${grainCount} signals). This feed uses grain as a primary energy source. Not typically recommended for horses with insulin resistance, EMS, or laminitis history.`
+        });
+      } else if (vitCount >= 4 && fiberCount <= 1 && grainCount <= 1) {
+        types.push({
+          label: 'Vitamin/Mineral Balancing Feed',
+          confidence: 'medium',
+          reason: 'Several vitamin and mineral sources detected but few calorie-dense ingredients. This may be a supplement or balancer designed to complement forage rather than provide significant calories.'
+        });
+      } else {
+        types.push({
+          label: 'General Purpose Feed',
+          confidence: 'low',
+          reason: 'Insufficient label keywords to narrow the classification further. A mix of ingredients is present but no dominant pattern was detected. Review the full label and consult the manufacturer for feeding guidance.'
+        });
+      }
     }
   }
 
