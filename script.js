@@ -301,6 +301,160 @@ function ul(items) {
 // FEED TYPE CLASSIFIER
 // ─────────────────────────────────────────────
 // ─────────────────────────────────────────────
+// RED FLAG INGREDIENT COMBINATIONS
+// Detects known problematic pairings or patterns
+// that a horse owner should be aware of
+// ─────────────────────────────────────────────
+function detectRedFlags(text, ingText, analysis) {
+  const full    = textLower(text);
+  const ing     = textLower(ingText || text);
+  const flags   = [];
+
+  // ── 1. High iron + low/absent copper and zinc
+  const hasIron       = /iron|ferrous/i.test(ing);
+  const ironPpmMatch  = text.match(/iron[^0-9]*([0-9]+\.?[0-9]*)\s*ppm/i);
+  const ironPpm       = ironPpmMatch ? parseFloat(ironPpmMatch[1]) : null;
+  const copperPpmMatch= text.match(/copper[^0-9]*([0-9]+\.?[0-9]*)\s*ppm/i);
+  const zincPpmMatch  = text.match(/zinc[^0-9]*([0-9]+\.?[0-9]*)\s*ppm/i);
+  const copperPpm     = copperPpmMatch ? parseFloat(copperPpmMatch[1]) : null;
+  const zincPpm       = zincPpmMatch   ? parseFloat(zincPpmMatch[1])   : null;
+
+  if (ironPpm !== null && ironPpm >= 150) {
+    if (copperPpm !== null && copperPpm < 40) {
+      flags.push({
+        level: 'critical',
+        title: 'High Iron + Low Copper',
+        detail: `Iron is listed at ${ironPpm} ppm and copper at only ${copperPpm} ppm. Iron competes with copper for absorption — high iron can significantly reduce how much copper your horse actually absorbs, even if the listed copper value looks adequate. This combination warrants a diet review with an equine nutritionist, especially if your hay source is also high in iron.`
+      });
+    } else if (zincPpm !== null && zincPpm < 100) {
+      flags.push({
+        level: 'caution',
+        title: 'High Iron + Low Zinc',
+        detail: `Iron is listed at ${ironPpm} ppm and zinc at ${zincPpm} ppm. Excess iron can interfere with zinc absorption. Combined with potentially high iron in hay (common in many regions), total iron load may be a concern. Ask your vet or nutritionist about your hay's iron levels.`
+      });
+    } else if (copperPpm === null && zincPpm === null) {
+      flags.push({
+        level: 'caution',
+        title: 'High Iron — Copper and Zinc Values Not Found',
+        detail: `Iron is listed at ${ironPpm} ppm. High iron antagonizes copper and zinc absorption, but copper and zinc values were not found in the pasted text. Ask the manufacturer for the full mineral panel to evaluate the iron-copper-zinc balance.`
+      });
+    }
+  }
+
+  // ── 2. Dual selenium sources
+  const hasSelYeast    = /selenium\s*yeast/i.test(ing);
+  const hasSodSelenite = /sodium\s*selenite/i.test(ing);
+  const hasSelProtein  = /selenium\s*proteinate/i.test(ing);
+  if ((hasSelYeast || hasSelProtein) && hasSodSelenite) {
+    const seVal = analysis && analysis.selenium ? analysis.selenium.value : null;
+    flags.push({
+      level: 'caution',
+      title: 'Dual Selenium Sources Detected',
+      detail: `Both organic selenium (${hasSelYeast ? 'selenium yeast' : ''}${hasSelProtein ? ' selenium proteinate' : ''}) and inorganic selenium (sodium selenite) are present in the ingredient list. Dual sources are common in commercial feeds, but total daily selenium from all sources — feed, hay, and supplements — must stay below approximately 2 mg/day for most horses. ${seVal ? `This feed lists selenium at ${seVal} ppm.` : 'The ppm value was not detected in the pasted text — ask the manufacturer.'} Selenium toxicity is serious and cumulative.`
+    });
+  }
+
+  // ── 3. Molasses + high NSC + performance claim
+  const hasMolasses  = /molasses/i.test(ing);
+  const nscVal       = analysis && analysis.nsc    ? analysis.nsc.value    : null;
+  const sugarVal     = analysis && analysis.sugar  ? analysis.sugar.value  : null;
+  const starchVal    = analysis && analysis.starch ? analysis.starch.value : null;
+  const calcNSC      = (sugarVal !== null && starchVal !== null) ? sugarVal + starchVal : null;
+  const effectiveNSC = nscVal || calcNSC;
+  if (hasMolasses && effectiveNSC !== null && effectiveNSC > 20) {
+    flags.push({
+      level: 'critical',
+      title: 'Molasses + High NSC',
+      detail: `Molasses is present in the ingredient list and NSC appears to be approximately ${effectiveNSC}%. This combination is not appropriate for horses with insulin resistance, EMS, PPID/Cushing's, or laminitis history. Do not feed this to metabolic horses without explicit veterinary approval.`
+    });
+  }
+
+  // ── 4. Sodium selenite as only selenium source at high ppm
+  if (hasSodSelenite && !hasSelYeast && !hasSelProtein) {
+    const seVal = analysis && analysis.selenium ? analysis.selenium.value : null;
+    if (seVal !== null && seVal > 0.5) {
+      flags.push({
+        level: 'caution',
+        title: 'Inorganic Selenium at Elevated Level',
+        detail: `Sodium selenite is the only selenium source detected, listed at ${seVal} ppm. Inorganic selenium has a narrower margin between adequate and toxic levels than organic forms. Total daily selenium from all sources (feed + hay + supplements) should be reviewed with your vet.`
+      });
+    }
+  }
+
+  // ── 5. Urea / non-protein nitrogen in horse feed
+  if (/\burea\b|non-protein nitrogen|npn/i.test(ing)) {
+    flags.push({
+      level: 'critical',
+      title: 'Urea / Non-Protein Nitrogen Detected',
+      detail: 'Urea or non-protein nitrogen (NPN) is present in the ingredient list. Unlike ruminants (cattle, sheep), horses cannot efficiently utilize NPN as a protein source — their digestive system is not designed for it. Urea in horse feed provides no usable protein and at high levels can be harmful. Consult your vet or nutritionist before feeding this to horses.'
+    });
+  }
+
+  // ── 6. Calcium carbonate + high alfalfa (excess calcium)
+  const hasLimestone = /limestone|calcium carbonate/i.test(ing);
+  const hasAlfalfa   = /alfalfa/i.test(ing);
+  const caMin        = analysis && analysis.calcium ? analysis.calcium.value : null;
+  if (hasLimestone && hasAlfalfa && caMin !== null && caMin > 1.5) {
+    flags.push({
+      level: 'caution',
+      title: 'High Calcium — Alfalfa + Limestone Both Present',
+      detail: `Both alfalfa (a high-calcium ingredient) and limestone (added calcium) are present, and calcium is listed at ${caMin}% (min). This is a high-calcium feed. When fed alongside alfalfa hay, total dietary calcium can become excessive and may interfere with phosphorus and magnesium balance. Discuss total diet calcium with your vet or nutritionist.`
+    });
+  }
+
+  // ── 7. Copper sulfate + high zinc without copper ppm to verify ratio
+  if (/copper sulfate|copper proteinate/i.test(ing) && zincPpm !== null && copperPpm !== null) {
+    const znCuRatio = (zincPpm / copperPpm).toFixed(1);
+    if (parseFloat(znCuRatio) > 6) {
+      flags.push({
+        level: 'caution',
+        title: 'Zinc:Copper Ratio May Be High',
+        detail: `Zinc is listed at ${zincPpm} ppm and copper at ${copperPpm} ppm — a Zn:Cu ratio of approximately ${znCuRatio}:1. The commonly recommended range is 3–4:1. A ratio above 6:1 may indicate excess zinc relative to copper, which can suppress copper absorption. This is worth reviewing if your horse is on this feed long-term.`
+      });
+    }
+  }
+
+  // ── 8. Propionic acid / mold inhibitor at top of list
+  if (/propionic acid|calcium propionate|mold inhibitor/i.test(ing)) {
+    const ingList = ing.split(',').map(s => s.trim());
+    const propPos = ingList.findIndex(i => /propionic|propionate|mold inhibitor/.test(i));
+    if (propPos >= 0 && propPos <= 4) {
+      flags.push({
+        level: 'note',
+        title: 'Mold Inhibitor Near Top of Ingredient List',
+        detail: `A mold inhibitor (propionic acid or calcium propionate) appears near position #${propPos + 1} in the ingredient list. These are generally safe and used to preserve feed quality, but their presence near the top suggests a higher moisture or grain content that requires preservation. Store this feed carefully and follow the manufacturer's storage guidelines.`
+      });
+    }
+  }
+
+  return flags;
+}
+
+// Render red flags as HTML block
+function renderRedFlagsHTML(flags) {
+  if (!flags.length) return '';
+
+  const styleMap = {
+    critical: { bg: '#FDF0EE', border: 'rgba(139,46,0,0.35)', titleColor: '#8B2E00', icon: '🚨' },
+    caution:  { bg: '#FDF3EE', border: 'rgba(200,130,26,0.3)', titleColor: '#8B4A00', icon: '⚠️' },
+    note:     { bg: '#F8F4EE', border: 'rgba(200,182,154,0.35)', titleColor: '#5C3A1A', icon: '◆' }
+  };
+
+  const html = flags.map(f => {
+    const s = styleMap[f.level] || styleMap.note;
+    return `<div style="background:${s.bg};border:1.5px solid ${s.border};border-radius:8px;padding:12px 15px;margin-bottom:10px;">
+      <div style="font-weight:700;color:${s.titleColor};margin-bottom:5px;font-size:0.9rem;">${s.icon} ${f.title}</div>
+      <div style="font-size:0.85rem;color:#3D3D38;line-height:1.55;">${f.detail}</div>
+    </div>`;
+  }).join('');
+
+  return `<div style="margin-top:6px;">
+    <div style="font-size:0.72rem;font-weight:700;letter-spacing:0.1em;text-transform:uppercase;color:#8B2E00;margin-bottom:8px;">⚑ Red Flag Combinations</div>
+    ${html}
+  </div>`;
+}
+
+// ─────────────────────────────────────────────
 // FEED FORM DETECTION
 // Detects textured, pelleted, extruded, cube,
 // or mixed form from label text and ingredients
@@ -794,6 +948,8 @@ function decodeLabel(text) {
   const ingredientOrderFlags = hasIngList ? analyzeIngredientOrder(text) : [];
   const ingredientOrderHTML  = renderIngredientOrderHTML(ingredientOrderFlags);
   const feedForm             = detectFeedForm(text, ingText);
+  const redFlags             = detectRedFlags(text, ingText, analysis);
+  const redFlagsHTML         = renderRedFlagsHTML(redFlags);
 
   // ── No-ingredient-list warning banner
   const noIngBanner = !hasIngList
@@ -1059,7 +1215,7 @@ function decodeLabel(text) {
     if (/lysine|methionine|threonine/i.test(text)) {
       notes.push(`Individual amino acids (lysine, methionine, threonine) are listed in the guaranteed analysis. This indicates the manufacturer is guaranteeing specific amino acid levels — a sign of a more precisely formulated feed focused on protein quality, not just crude protein quantity.`);
     }
-    vitHTML = vparts.join('<br>') + (notes.length ? '<br><br>' + notes.join('<br><br>') : '');
+    vitHTML = vparts.join('<br>') + (notes.length ? '<br><br>' + notes.join('<br><br>') : '') + (redFlagsHTML ? '<br><br>' + redFlagsHTML : '');
   } else {
     vitHTML = 'No specific vitamin or mineral ingredients detected.';
   }
@@ -1133,6 +1289,14 @@ function decodeLabel(text) {
 
   // ── Questions to Ask
   const missing = [];
+  // Prepend red flag questions
+  if (redFlags.length) {
+    redFlags.forEach(f => {
+      if (f.level === 'critical') {
+        missing.push(`<strong style="color:#8B2E00">⚠ ${f.title} — review this with your vet before feeding.</strong>`);
+      }
+    });
+  }
   if (!hasIngList) missing.push('Paste the full ingredient list for a complete analysis — energy sources, fiber, fat, and protein sections cannot be evaluated from the guaranteed analysis alone.');
   if (!analysis.nsc && !analysis.sugar && !analysis.starch) missing.push('NSC, sugar, and starch values were not detected. Ask the manufacturer — critical for horses with insulin resistance, laminitis, EMS, or PPID/Cushing\'s.');
   if (!analysis.vitE) missing.push('Vitamin E IU per pound not detected. Important for horses without regular pasture access.');
