@@ -2311,6 +2311,10 @@ function populateAnalysisGuide() {
 // DOM: RENDER DECODER OUTPUT
 // ─────────────────────────────────────────────
 function renderOutput(result) {
+  // Clear stale status messages
+  const libStatus = document.getElementById('libraryStatusMsg');
+  if (libStatus) libStatus.style.display = 'none';
+
   // Intro summary
   const introEl = document.getElementById('oc-intro');
   const introBlock = document.getElementById('introSummaryBlock');
@@ -2376,9 +2380,41 @@ document.addEventListener('DOMContentLoaded', function () {
   });
 
   clearBtn.addEventListener('click', function () {
+    // Clear textarea
     feedInput.value = '';
+
+    // Hide output + share block
     output.style.display = 'none';
     output.classList.remove('visible');
+    const shareBlock = document.getElementById('shareBlock');
+    if (shareBlock) shareBlock.style.display = 'none';
+    const shareCard = document.getElementById('shareCard');
+    if (shareCard) shareCard.style.display = 'none';
+    const introBlock = document.getElementById('introSummaryBlock');
+    if (introBlock) introBlock.style.display = 'none';
+
+    // Reset library dropdown
+    const libDrop = document.getElementById('libraryDropdown');
+    if (libDrop) libDrop.value = '';
+    const libStatus = document.getElementById('libraryStatusMsg');
+    if (libStatus) libStatus.style.display = 'none';
+
+    // Reset ration builder output
+    const rationOut = document.getElementById('rationOutput');
+    if (rationOut) { rationOut.innerHTML = ''; rationOut.style.display = 'none'; }
+    const rationAnalyzeBtn = document.getElementById('rationAnalyzeBtn');
+    if (rationAnalyzeBtn) rationAnalyzeBtn.style.display = 'none';
+
+    // Reset profile chip selections (but keep them visible)
+    document.querySelectorAll('.profile-btn.selected, .profile-btn.selected-caution').forEach(function(btn) {
+      btn.classList.remove('selected', 'selected-caution');
+    });
+
+    // Hide profile save opt-in (re-shows on next selection)
+    const saveOpt = document.getElementById('profileSaveOpt');
+    if (saveOpt) saveOpt.style.display = 'none';
+
+    // Reset OCR
     window.resetOCR();
     window.scrollTo({ top: 0, behavior: 'smooth' });
   });
@@ -2657,9 +2693,15 @@ document.addEventListener('DOMContentLoaded', function () {
     if (ocrFileInput2) {
       ocrFileInput2.addEventListener('change', function () {
         if (this.files && this.files[0]) {
-          // Clear previous results first
+          // Full reset before new scan
           const output = document.getElementById('decoderOutput');
           if (output) { output.style.display = 'none'; output.classList.remove('visible'); }
+          const shareBlock = document.getElementById('shareBlock');
+          if (shareBlock) shareBlock.style.display = 'none';
+          const introBlock = document.getElementById('introSummaryBlock');
+          if (introBlock) introBlock.style.display = 'none';
+          const libDrop = document.getElementById('libraryDropdown');
+          if (libDrop) libDrop.value = '';
           feedInputEl.value = '';
           handleFileSelect(this.files[0]);
         }
@@ -2670,6 +2712,12 @@ document.addEventListener('DOMContentLoaded', function () {
     if (ocrRemoveBtn) {
       ocrRemoveBtn.addEventListener('click', function () {
         window.resetOCR();
+        // Also clear any partial decode
+        const output = document.getElementById('decoderOutput');
+        if (output) { output.style.display = 'none'; output.classList.remove('visible'); }
+        const introBlock = document.getElementById('introSummaryBlock');
+        if (introBlock) introBlock.style.display = 'none';
+        feedInputEl.value = '';
         window.scrollTo({ top: 0, behavior: 'smooth' });
       });
     }
