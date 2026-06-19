@@ -1,0 +1,412 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Feed Matchmaker — Find the Right Feed for Your Horse | HorseNutritionGuide.com</title>
+  <meta name="description" content="Enter your horse's weight, workload, health concerns, and hay program — get a ranked list of feeds from our verified library matched to NRC nutritional standards." />
+  <link rel="stylesheet" href="styles.css" />
+  <style>
+    /* ── Matchmaker page styles ── */
+    .mm-hero { background: linear-gradient(135deg,#1C3A2F 0%,#2D5C47 100%); padding: 40px 20px 32px; text-align:center; }
+    .mm-hero h1 { color:#F8F4EE; font-size:clamp(1.6rem,5vw,2.3rem); margin-bottom:8px; }
+    .mm-hero p  { color:rgba(248,244,238,0.75); font-size:0.95rem; max-width:520px; margin:0 auto; }
+    .mm-body { max-width:700px; margin:0 auto; padding:28px 16px 72px; }
+
+    /* Form card */
+    .mm-card { background:#fff; border:1px solid #D5E8DD; border-radius:12px; padding:22px 20px; margin-bottom:20px; }
+    .mm-card-title { font-size:0.72rem; font-weight:700; text-transform:uppercase; letter-spacing:0.12em; color:#2D5C47; margin-bottom:16px; }
+    .mm-field { margin-bottom:18px; }
+    .mm-label { display:block; font-size:0.85rem; font-weight:600; color:#1C3A2F; margin-bottom:6px; }
+    .mm-label-sub { font-size:0.78rem; font-weight:400; color:#6B6B64; margin-left:6px; }
+    .mm-select, .mm-input {
+      width:100%; font-family:inherit; font-size:0.92rem; padding:10px 12px;
+      border:1.5px solid #C5DDD0; border-radius:7px; background:#fff; color:#1C3A2F;
+      -webkit-appearance:none; outline:none; box-sizing:border-box;
+    }
+    .mm-select:focus, .mm-input:focus { border-color:#2D5C47; }
+    .mm-range-wrap { display:flex; align-items:center; gap:12px; }
+    .mm-range { flex:1; accent-color:#2D5C47; }
+    .mm-range-val { font-size:0.92rem; font-weight:700; color:#1C3A2F; min-width:60px; text-align:right; }
+    .mm-chips { display:flex; flex-wrap:wrap; gap:8px; margin-top:2px; }
+    .mm-chip { font-family:inherit; font-size:0.82rem; font-weight:600; padding:6px 13px;
+      border:1.5px solid #C5DDD0; border-radius:20px; background:#fff; color:#3D3D38;
+      cursor:pointer; transition:all 0.13s; -webkit-tap-highlight-color:transparent; }
+    .mm-chip.selected { background:#2D5C47; color:#F8F4EE; border-color:#2D5C47; }
+    .mm-chip.selected-warn { background:#C8821A; color:#fff; border-color:#C8821A; }
+    .mm-2col { display:grid; grid-template-columns:1fr 1fr; gap:12px; }
+    @media(max-width:480px){ .mm-2col { grid-template-columns:1fr; } }
+    .btn-match { font-family:inherit; font-size:1rem; font-weight:700; padding:14px 20px;
+      background:#1C3A2F; color:#F8F4EE; border:none; border-radius:8px; cursor:pointer;
+      width:100%; transition:opacity 0.15s; margin-top:4px; }
+    .btn-match:hover { opacity:0.88; }
+
+    /* Results */
+    .mm-results { margin-top:24px; }
+    .mm-results-header { font-size:0.72rem; font-weight:700; text-transform:uppercase;
+      letter-spacing:0.12em; color:#2D5C47; margin-bottom:14px; }
+
+    /* NRC gap summary */
+    .mm-gap-card { background:#F2F7F4; border:1px solid #C5DDD0; border-radius:10px;
+      padding:16px 18px; margin-bottom:16px; }
+    .mm-gap-title { font-size:0.82rem; font-weight:700; color:#1C3A2F; margin-bottom:10px; }
+    .mm-gap-row { display:flex; justify-content:space-between; align-items:center;
+      font-size:0.83rem; padding:5px 0; border-bottom:1px solid rgba(0,0,0,0.06); }
+    .mm-gap-row:last-child { border-bottom:none; }
+    .mm-gap-label { color:#5C5C54; }
+    .mm-gap-val { font-weight:700; color:#1C3A2F; }
+    .mm-gap-val.met { color:#2D5C47; }
+    .mm-gap-val.gap { color:#C8821A; }
+
+    /* Feed result cards */
+    .mm-result-card { background:#fff; border:1.5px solid #D5E8DD; border-radius:10px;
+      padding:18px 18px 14px; margin-bottom:12px; position:relative; }
+    .mm-result-card.top-pick { border-color:#1C3A2F; border-width:2px; }
+    .mm-result-rank { position:absolute; top:14px; right:14px; font-size:0.72rem;
+      font-weight:700; background:#1C3A2F; color:#F8F4EE; padding:3px 9px;
+      border-radius:10px; }
+    .mm-result-rank.second { background:#2D5C47; }
+    .mm-result-rank.third  { background:#C5DDD0; color:#1C3A2F; }
+    .mm-result-name { font-size:1.0rem; font-weight:700; color:#1C3A2F; margin-bottom:4px; padding-right:70px; }
+    .mm-result-rate { font-size:0.82rem; color:#C8821A; font-weight:700; margin-bottom:10px; }
+    .mm-result-notes { display:flex; flex-wrap:wrap; gap:6px; margin-bottom:10px; }
+    .mm-note-pill { font-size:0.75rem; padding:3px 10px; border-radius:12px;
+      background:#F0F9F4; color:#1C3A2F; border:1px solid #C5DDD0; }
+    .mm-note-pill.warn { background:#FBF0DC; color:#8B4A00; border-color:#E8C876; }
+    .mm-result-score { font-size:0.75rem; color:#888; margin-top:6px; }
+    .mm-result-cta { margin-top:10px; }
+    .btn-load-feed { font-family:inherit; font-size:0.85rem; font-weight:600; padding:8px 16px;
+      background:#2D5C47; color:#F8F4EE; border:none; border-radius:6px; cursor:pointer;
+      transition:opacity 0.15s; }
+    .btn-load-feed:hover { opacity:0.85; }
+
+    /* Score bar */
+    .mm-score-bar-wrap { margin-top:8px; }
+    .mm-score-bar-bg { background:#E8F2ED; border-radius:4px; height:6px; overflow:hidden; }
+    .mm-score-bar-fill { height:100%; border-radius:4px; background:linear-gradient(90deg,#2D5C47,#4E9A7A); transition:width 0.4s; }
+
+    /* Eliminated section */
+    .mm-eliminated { margin-top:16px; }
+    .mm-eliminated-title { font-size:0.75rem; color:#888; font-weight:600; margin-bottom:8px; }
+    .mm-elim-item { font-size:0.8rem; color:#888; padding:4px 0; border-bottom:1px solid #f0f0eb; }
+    .mm-elim-item strong { color:#C8821A; }
+
+    /* NRC standards table */
+    .mm-standards-toggle { font-size:0.82rem; color:#2D5C47; font-weight:600; cursor:pointer;
+      background:none; border:none; font-family:inherit; padding:0; margin-top:8px;
+      text-decoration:underline; }
+    .mm-standards-table { display:none; margin-top:12px; width:100%; border-collapse:collapse; font-size:0.8rem; }
+    .mm-standards-table th { background:#F2F7F4; color:#2D5C47; font-weight:700; padding:6px 10px;
+      text-align:left; border-bottom:2px solid #C5DDD0; }
+    .mm-standards-table td { padding:5px 10px; border-bottom:1px solid #EEEAE4; color:#3D3D38; }
+    .mm-standards-table tr:last-child td { border-bottom:none; }
+
+    .back-link { display:inline-flex; align-items:center; gap:6px; color:#2D5C47;
+      font-size:0.85rem; font-weight:600; text-decoration:none; margin-bottom:24px; }
+    .back-link:hover { text-decoration:underline; }
+    .mm-empty { text-align:center; padding:32px 20px; color:#888; font-size:0.9rem; }
+  </style>
+</head>
+<body>
+
+<header class="site-header">
+  <div class="container header-inner">
+    <a href="index.html" class="logo"><span class="logo-mark">&#9670;</span>HorseNutritionGuide<span class="logo-dot">.com</span></a>
+    <a href="glossary.html" class="header-link">Glossary</a>
+  </div>
+</header>
+
+<div class="mm-hero">
+  <h1>&#127775; Feed Matchmaker</h1>
+  <p>Tell us about your horse — weight, workload, health concerns, and hay program. We score every feed in our verified library against NRC nutritional standards and rank the best fits.</p>
+</div>
+
+<div class="mm-body">
+  <a href="index.html" class="back-link">&#8592; Back to Feed Decoder</a>
+
+  <!-- ── FORM ── -->
+  <div class="mm-card">
+    <div class="mm-card-title">About Your Horse</div>
+
+    <div class="mm-field">
+      <label class="mm-label" for="mm-weight">Body Weight <span class="mm-label-sub">— estimate is fine</span></label>
+      <div class="mm-range-wrap">
+        <input type="range" id="mm-weight" class="mm-range" min="600" max="1400" step="50" value="1100" />
+        <div class="mm-range-val"><span id="mm-weight-val">1,100</span> lbs</div>
+      </div>
+    </div>
+
+    <div class="mm-field">
+      <label class="mm-label" for="mm-stage">Life Stage / Workload</label>
+      <select id="mm-stage" class="mm-select">
+        <option value="maintenance">Maintenance / Idle — adult horse, not in regular work</option>
+        <option value="light">Light Work — 1–3 hrs/wk, mostly walking</option>
+        <option value="moderate" selected>Moderate Work — 3–5 hrs/wk, regular riding</option>
+        <option value="heavy">Heavy Work — cutting, reining, roping, dressage, jumping</option>
+        <option value="very_heavy">Very Heavy / Elite — racing, elite endurance, high-level competition</option>
+        <option value="senior">Senior (15+ years) — reduced digestive efficiency</option>
+        <option value="pregnant">Pregnant Mare — last trimester</option>
+        <option value="lactating">Lactating Mare — peak milk production</option>
+        <option value="growing">Growing / Weanling — active growth phase</option>
+        <option value="metabolic">Easy Keeper / Metabolic — EMS, IR, laminitis, PPID, overweight</option>
+      </select>
+    </div>
+
+    <div class="mm-field">
+      <label class="mm-label">Health Concerns <span class="mm-label-sub">(select all that apply)</span></label>
+      <div class="mm-chips" id="mm-health">
+        <button class="mm-chip" data-value="none">None / Healthy</button>
+        <button class="mm-chip" data-value="ir">Insulin Resistance / EMS</button>
+        <button class="mm-chip" data-value="laminitis">Laminitis / Founder history</button>
+        <button class="mm-chip" data-value="cushings">Cushing's / PPID</button>
+        <button class="mm-chip" data-value="pssm">PSSM / Tying-up</button>
+        <button class="mm-chip" data-value="ulcers">Ulcers / Digestive issues</button>
+        <button class="mm-chip" data-value="hoof">Poor hoof quality</button>
+        <button class="mm-chip" data-value="weight_loss">Hard keeper / Underweight</button>
+        <button class="mm-chip" data-value="no_pasture">No pasture access</button>
+      </div>
+    </div>
+  </div>
+
+  <div class="mm-card">
+    <div class="mm-card-title">Hay &amp; Forage Program</div>
+
+    <div class="mm-2col">
+      <div class="mm-field">
+        <label class="mm-label" for="mm-hay-type">Hay Type</label>
+        <select id="mm-hay-type" class="mm-select">
+          <option value="alfalfa">Alfalfa (pure)</option>
+          <option value="grass" selected>Grass hay (timothy, orchard, bermuda)</option>
+          <option value="mixed">Mixed alfalfa / grass</option>
+          <option value="unknown">Unknown / varies</option>
+        </select>
+      </div>
+      <div class="mm-field">
+        <label class="mm-label" for="mm-hay-lbs">Daily Hay Fed</label>
+        <div class="mm-range-wrap">
+          <input type="range" id="mm-hay-lbs" class="mm-range" min="0" max="30" step="1" value="20" />
+          <div class="mm-range-val"><span id="mm-hay-lbs-val">20</span> lbs</div>
+        </div>
+      </div>
+    </div>
+
+    <div class="mm-field">
+      <label class="mm-label">Pasture Access</label>
+      <div class="mm-chips" id="mm-pasture">
+        <button class="mm-chip" data-value="none" class="selected">None / Dry lot</button>
+        <button class="mm-chip" data-value="limited">Limited (&lt;2 hrs/day)</button>
+        <button class="mm-chip" data-value="moderate">Moderate (2–6 hrs/day)</button>
+        <button class="mm-chip" data-value="full">Full turnout</button>
+      </div>
+    </div>
+  </div>
+
+  <button class="btn-match" id="mmRunBtn">&#127775; Find My Best Feeds</button>
+
+  <!-- ── RESULTS ── -->
+  <div class="mm-results" id="mmResults" style="display:none;">
+
+    <div class="mm-results-header">Results — Ranked by fit to your horse</div>
+
+    <!-- NRC Gap Summary -->
+    <div class="mm-gap-card" id="mmGapCard"></div>
+
+    <!-- NRC standards table (expandable) -->
+    <div style="margin-bottom:16px;">
+      <button class="mm-standards-toggle" id="mmStandardsToggle">&#9660; View full NRC daily requirements for this horse</button>
+      <table class="mm-standards-table" id="mmStandardsTable">
+        <thead><tr><th>Nutrient</th><th>Daily Requirement</th><th>From Hay (est.)</th><th>Gap to Fill</th></tr></thead>
+        <tbody id="mmStandardsBody"></tbody>
+      </table>
+    </div>
+
+    <!-- Feed recommendation cards -->
+    <div id="mmFeedCards"></div>
+
+    <!-- Eliminated feeds -->
+    <div class="mm-eliminated" id="mmEliminated" style="display:none;">
+      <div class="mm-eliminated-title">Feeds excluded for this horse:</div>
+      <div id="mmEliminatedList"></div>
+    </div>
+
+  </div>
+
+</div>
+
+<footer class="site-footer">
+  <div class="container footer-inner">
+    <div class="footer-brand"><span class="logo-mark">&#9670;</span> HorseNutritionGuide<span class="logo-dot">.com</span></div>
+    <p class="footer-note">Feed matching is based on NRC 2007 standards and verified label data. Hay contributions are estimates — actual values depend on forage quality. This tool is educational, not a substitute for a complete diet formulation by a qualified equine nutritionist.</p>
+    <p class="footer-copy">&copy; 2025 HorseNutritionGuide.com</p>
+  </div>
+</footer>
+
+<script src="feed-library.js"></script>
+<script src="matchmaker.js"></script>
+<script>
+(function() {
+  'use strict';
+
+  // ── Range slider display
+  document.getElementById('mm-weight').addEventListener('input', function() {
+    document.getElementById('mm-weight-val').textContent = parseInt(this.value).toLocaleString();
+  });
+  document.getElementById('mm-hay-lbs').addEventListener('input', function() {
+    document.getElementById('mm-hay-lbs-val').textContent = this.value;
+  });
+
+  // ── Chip toggles
+  function initChips(containerId, multi) {
+    const container = document.getElementById(containerId);
+    container.querySelectorAll('.mm-chip').forEach(function(btn) {
+      btn.addEventListener('click', function() {
+        if (!multi) {
+          container.querySelectorAll('.mm-chip').forEach(b => b.classList.remove('selected','selected-warn'));
+          this.classList.add('selected');
+        } else {
+          if (this.dataset.value === 'none') {
+            container.querySelectorAll('.mm-chip').forEach(b => b.classList.remove('selected','selected-warn'));
+            this.classList.add('selected');
+          } else {
+            container.querySelector('[data-value="none"]')?.classList.remove('selected');
+            this.classList.toggle('selected-warn');
+          }
+        }
+      });
+    });
+  }
+  initChips('mm-health', true);
+  initChips('mm-pasture', false);
+
+  function getChipValues(containerId) {
+    return Array.from(document.getElementById(containerId).querySelectorAll('.mm-chip.selected,.mm-chip.selected-warn'))
+      .map(b => b.dataset.value).filter(v => v !== 'none');
+  }
+
+  // ── NRC standards toggle
+  document.getElementById('mmStandardsToggle').addEventListener('click', function() {
+    const table = document.getElementById('mmStandardsTable');
+    const shown = table.style.display === 'table';
+    table.style.display = shown ? 'none' : 'table';
+    this.textContent = (shown ? '▼' : '▲') + ' View full NRC daily requirements for this horse';
+  });
+
+  // ── Run matchmaker
+  document.getElementById('mmRunBtn').addEventListener('click', function() {
+    const weightLbs = parseInt(document.getElementById('mm-weight').value);
+    const stage     = document.getElementById('mm-stage').value;
+    const hayType   = document.getElementById('mm-hay-type').value;
+    const hayLbs    = parseInt(document.getElementById('mm-hay-lbs').value);
+    const health    = getChipValues('mm-health');
+    const pasture   = getChipValues('mm-pasture')[0] || 'none';
+
+    const profile = { weightLbs, stage, health, hayType, hayLbs, pasture };
+    const result  = window.matchFeed(profile);
+
+    if (!result) {
+      document.getElementById('mmResults').style.display = 'block';
+      document.getElementById('mmFeedCards').innerHTML = '<div class="mm-empty">Library not loaded. Refresh and try again.</div>';
+      return;
+    }
+
+    renderResults(result, profile);
+    document.getElementById('mmResults').style.display = 'block';
+    document.getElementById('mmResults').scrollIntoView({ behavior:'smooth', block:'start' });
+  });
+
+  function renderResults(result, profile) {
+    const stageLabel = (window.NRC_STANDARDS[profile.stage] || {}).label || profile.stage;
+    const weightLbs  = profile.weightLbs;
+
+    // ── Gap summary card
+    const sc  = result.scaled;
+    const hc  = result.hayContrib;
+    const gapRows = [
+      ['Digestible Energy', sc.DE_Mcal ? sc.DE_Mcal.toFixed(1) + ' Mcal/day' : '—', hc.DE_Mcal ? hc.DE_Mcal.toFixed(1) + ' Mcal' : '—', result.deGap > 0 ? result.deGap.toFixed(1) + ' Mcal needed from feed' : 'Met by hay ✓'],
+      ['Crude Protein',     sc.CP_g    ? Math.round(sc.CP_g) + ' g/day' : '—',      hc.CP_g    ? Math.round(hc.CP_g) + ' g' : '—',         result.cpGap > 0 ? Math.round(result.cpGap) + ' g needed from feed' : 'Met by hay ✓'],
+      ['Vitamin E',         sc.VitE_IU ? sc.VitE_IU.toLocaleString() + ' IU/day' : '—', 'Low in hay', 'Needs fortified feed or supplement'],
+      ['Selenium',          sc.Se_mg   ? sc.Se_mg.toFixed(1) + ' mg/day' : '—',     '~0.06 mg from hay', 'Needs fortified feed'],
+      ['Copper',            sc.Cu_mg   ? sc.Cu_mg + ' mg/day' : '—',                'Low in grass hay', 'Needs fortified feed'],
+      ['Zinc',              sc.Zn_mg   ? sc.Zn_mg + ' mg/day' : '—',                'Low in most hay', 'Needs fortified feed'],
+    ];
+
+    document.getElementById('mmGapCard').innerHTML =
+      '<div class="mm-gap-title">NRC Requirements for a ' + weightLbs.toLocaleString() + '-lb ' + stageLabel + ' Horse</div>' +
+      gapRows.map(function(r) {
+        const isGap = r[3].includes('needed') || r[3].includes('Needs');
+        return '<div class="mm-gap-row"><span class="mm-gap-label">' + r[0] + '</span>' +
+          '<span style="font-size:0.8rem;color:#888;">' + r[1] + ' req. / ' + r[2] + ' from hay</span>' +
+          '<span class="mm-gap-val ' + (isGap ? 'gap' : 'met') + '">' + r[3] + '</span></div>';
+      }).join('') +
+      (result.scaled.NSC_max ? '<div class="mm-gap-row"><span class="mm-gap-label">NSC Limit</span><span></span><span class="mm-gap-val gap">Below ' + result.scaled.NSC_max + '% required</span></div>' : '');
+
+    // ── NRC standards table
+    const stdRows = [
+      ['Digestible Energy', sc.DE_Mcal ? sc.DE_Mcal.toFixed(1) + ' Mcal' : '—'],
+      ['Crude Protein',     sc.CP_g    ? Math.round(sc.CP_g) + ' g' : '—'],
+      ['Lysine',            sc.Lys_g   ? sc.Lys_g.toFixed(0) + ' g' : '—'],
+      ['Calcium',           sc.Ca_g    ? sc.Ca_g.toFixed(1) + ' g' : '—'],
+      ['Phosphorus',        sc.P_g     ? sc.P_g.toFixed(1) + ' g' : '—'],
+      ['Magnesium',         sc.Mg_g    ? sc.Mg_g.toFixed(1) + ' g' : '—'],
+      ['Potassium',         sc.K_g     ? sc.K_g.toFixed(1) + ' g' : '—'],
+      ['Selenium',          sc.Se_mg   ? sc.Se_mg.toFixed(2) + ' mg' : '—'],
+      ['Copper',            sc.Cu_mg   ? sc.Cu_mg + ' mg' : '—'],
+      ['Zinc',              sc.Zn_mg   ? sc.Zn_mg + ' mg' : '—'],
+      ['Vitamin E',         sc.VitE_IU ? sc.VitE_IU.toLocaleString() + ' IU' : '—'],
+      ['Vitamin A',         sc.VitA_IU ? sc.VitA_IU.toLocaleString() + ' IU' : '—'],
+      ['Vitamin D',         sc.VitD_IU ? sc.VitD_IU.toLocaleString() + ' IU' : '—'],
+    ];
+    document.getElementById('mmStandardsBody').innerHTML = stdRows.map(function(r) {
+      const hayVal = result.hayContrib[r[0].replace(' ','_')] || null;
+      const hayStr = hayVal ? hayVal.toFixed(1) + ' (est.)' : 'Minimal';
+      const req    = r[1];
+      return '<tr><td>' + r[0] + '</td><td>' + req + '</td><td>' + hayStr + '</td><td style="color:#C8821A">From feed</td></tr>';
+    }).join('');
+
+    // ── Feed cards
+    const top  = result.top.slice(0, 5);
+    const rankLabels = ['#1 Best Fit', '#2', '#3', '#4', '#5'];
+    const rankClasses = ['top-pick', 'second', 'third', '', ''];
+
+    document.getElementById('mmFeedCards').innerHTML = top.length === 0
+      ? '<div class="mm-empty">No matching feeds found in the current library for this horse profile. More feeds are being added regularly.</div>'
+      : top.map(function(feed, i) {
+          const maxScore = 100;
+          const barPct   = Math.min(100, Math.round((feed.score / maxScore) * 100));
+          const goodNotes = feed.notes.filter(n => n.includes('✓'));
+          const warnNotes = feed.notes.filter(n => !n.includes('✓'));
+          const nscBadge  = feed.nsc !== null ? ' · NSC ' + feed.nsc + '%' : '';
+
+          return '<div class="mm-result-card ' + (rankClasses[i]||'') + '">' +
+            '<div class="mm-result-rank ' + (rankClasses[i]||'') + '">' + rankLabels[i] + '</div>' +
+            '<div class="mm-result-name">' + feed.name + '</div>' +
+            '<div class="mm-result-rate">Suggested: ' + feed.feedRateLabel + nscBadge + '</div>' +
+            '<div class="mm-result-notes">' +
+              goodNotes.map(n => '<span class="mm-note-pill">' + n + '</span>').join('') +
+              warnNotes.map(n => '<span class="mm-note-pill warn">' + n + '</span>').join('') +
+            '</div>' +
+            '<div class="mm-score-bar-wrap"><div class="mm-score-bar-bg"><div class="mm-score-bar-fill" style="width:' + barPct + '%"></div></div></div>' +
+            '<div class="mm-result-score">Match score: ' + feed.score + '/100</div>' +
+            '<div class="mm-result-cta"><button class="btn-load-feed" onclick="loadFeedToDecoder(\'' + feed.name.replace(/'/g,"\\'") + '\')">Load in Decoder &#8594;</button></div>' +
+            '</div>';
+        }).join('');
+
+    // ── Eliminated
+    if (result.eliminated.length > 0) {
+      document.getElementById('mmEliminated').style.display = 'block';
+      document.getElementById('mmEliminatedList').innerHTML = result.eliminated.map(function(f) {
+        return '<div class="mm-elim-item"><strong>' + f.name + '</strong> — ' + (f.elimReason || 'excluded') + '</div>';
+      }).join('');
+    }
+  }
+
+  // ── Load a feed into the decoder on index.html
+  window.loadFeedToDecoder = function(name) {
+    sessionStorage.setItem('hng_load_feed', name);
+    window.location.href = 'index.html?feed=' + encodeURIComponent(name);
+  };
+
+})();
+</script>
+</body>
+</html>
