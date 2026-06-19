@@ -1481,7 +1481,28 @@ function decodeLabel(text) {
   if (grainFound.length) energyParts.push(`<strong>Grain/starch energy:</strong> ${grainFound.map(f => pill(f)).join(' ')}`);
   if (fatFound.length)   energyParts.push(`<strong>Fat energy:</strong> ${fatFound.map(f => pill(f)).join(' ')}`);
 
-  const energyBase = !hasIngList ? noIngMsg
+  // Analysis-only energy: derive from fat%, fiber%, NSC if available
+  let gaEnergyMsg = '';
+  if (!hasIngList) {
+    const gfat = analysis.fat ? analysis.fat.value : null;
+    const gfib = analysis.fiber ? analysis.fiber.value : null;
+    const gnsc = analysis.nsc ? analysis.nsc.value : (analysis.starch && analysis.sugar ? analysis.starch.value + analysis.sugar.value : null);
+    const parts = [];
+    if (gfat !== null) {
+      if (gfat >= 10) parts.push(`<strong>Fat ${gfat}%</strong> — high-fat formula. Energy comes significantly from fat (2.25× more energy per gram than carbs). Low blood-sugar impact.`);
+      else if (gfat >= 5) parts.push(`<strong>Fat ${gfat}%</strong> — moderate fat. Some calorie density beyond a basic feed.`);
+      else parts.push(`<strong>Fat ${gfat}%</strong> — low fat. Energy comes primarily from carbohydrates.`);
+    }
+    if (gnsc !== null) {
+      if (gnsc <= 10) parts.push(`<strong>NSC ~${gnsc.toFixed(1)}%</strong> — low starch and sugar. Energy source is primarily fiber-fermentation (hindgut), not grain starch.`);
+      else if (gnsc <= 20) parts.push(`<strong>NSC ~${gnsc.toFixed(1)}%</strong> — moderate starch and sugar. Mixed grain/fiber energy profile.`);
+      else parts.push(`<strong>NSC ~${gnsc.toFixed(1)}%</strong> — elevated. Primary energy is grain starch. Not appropriate for metabolic horses.`);
+    }
+    if (gfib !== null && gfib >= 18) parts.push(`<strong>Crude Fiber ${gfib}%</strong> — high fiber content. This feed has significant forage character and may partially replace hay.`);
+    gaEnergyMsg = parts.length ? parts.join('<br><br>') + '<br><br><em style="color:#888;font-size:0.85rem">Paste the full ingredient list for a complete energy source breakdown.</em>' : noIngMsg;
+  }
+
+  const energyBase = !hasIngList ? gaEnergyMsg
     : energyParts.length ? energyParts.join('<br>')
     : 'No clear energy source ingredients detected. Check that the ingredient list was included.';
 
@@ -1490,8 +1511,19 @@ function decodeLabel(text) {
     : '');
 
   // ── Protein
+  const gaProteinMsg = !hasIngList && analysis.protein ? (() => {
+    const cp = analysis.protein.value;
+    const lys = analysis.lysine ? ` Lysine is guaranteed at <strong>${analysis.lysine.value}%</strong> — a sign of protein quality focus.` : '';
+    const meth = analysis.methionine ? ` Methionine: <strong>${analysis.methionine.value}%</strong>.` : '';
+    const desc = cp >= 28 ? 'Very high — consistent with a ration balancer (feed 1–2 lbs/day; actual daily protein delivery is moderate).'
+      : cp >= 16 ? 'Elevated — appropriate for growing horses, breeding stock, or high-performance.'
+      : cp >= 12 ? 'Moderate — typical of a formulated concentrate for adult horses at work.'
+      : 'Lower-protein formula. Verify this meets your horse\'s needs for their workload.';
+    return `<strong>Crude Protein: ${cp}%</strong> — ${desc}${lys}${meth}<br><br><em style="color:#888;font-size:0.85rem">Paste the ingredient list to see protein sources (soybean meal, alfalfa, etc.).</em>`;
+  })() : noIngMsg;
+
   const proteinHTML = !hasIngList
-    ? noIngMsg
+    ? gaProteinMsg
     : proteinFound.length
       ? (() => {
         const fromAnalysis = proteinFound.filter(p => ['lysine','methionine','threonine'].includes(p.toLowerCase()));
@@ -1509,15 +1541,33 @@ function decodeLabel(text) {
       : 'No recognized protein ingredients detected. Check that the ingredient list was included.';
 
   // ── Fiber
+  const gaFiberMsg = !hasIngList && analysis.fiber ? (() => {
+    const cf = analysis.fiber.value;
+    const adf = analysis.adf ? ` ADF: <strong>${analysis.adf.value}%</strong>.` : '';
+    const ndf = analysis.ndf ? ` NDF: <strong>${analysis.ndf.value}%</strong>.` : '';
+    const desc = cf >= 22 ? 'high — this feed has significant forage character and may partially replace hay.'
+      : cf >= 14 ? 'moderate — typical of a fiber-enhanced concentrate.'
+      : 'lower — this is primarily a concentrate, not a fiber supplement. Hay is still essential.';
+    return `<strong>Crude Fiber: ${cf}%</strong> — ${desc}${adf}${ndf}<br><br><em style="color:#888;font-size:0.85rem">Paste the ingredient list to see fiber sources (beet pulp, soybean hulls, alfalfa, etc.).</em>`;
+  })() : noIngMsg;
+
   const fiberHTML = !hasIngList
-    ? noIngMsg
+    ? gaFiberMsg
     : fiberFound.length
       ? `${fiberFound.map(f => pill(f)).join(' ')}<br><br>These fiber sources support hindgut health and provide digestible energy. Highly fermentable fibers like beet pulp and soybean hulls are considered safe energy sources for many horses including those with metabolic concerns.`
       : 'No specific fiber ingredients detected. Check that the ingredient list was included.';
 
   // ── Fat
+  const gaFatMsg = !hasIngList && analysis.fat ? (() => {
+    const f = analysis.fat.value;
+    const desc = f >= 10 ? 'high fat — adds dense calories without starch. Good for hard keepers, performance horses, horses that need weight without grain.'
+      : f >= 5 ? 'moderate fat — provides some caloric density.'
+      : 'low fat — this is not a fat-based energy formula.';
+    return `<strong>Crude Fat: ${f}%</strong> — ${desc}<br><br><em style="color:#888;font-size:0.85rem">Paste the ingredient list to see fat sources (rice bran, flaxseed, vegetable oil, etc.).</em>`;
+  })() : noIngMsg;
+
   const fatHTML = !hasIngList
-    ? noIngMsg
+    ? gaFatMsg
     : fatFound.length
       ? `${fatFound.map(f => pill(f)).join(' ')}<br><br>Fat-based ingredients provide concentrated energy without raising starch or sugar levels. Flaxseed and fish oil also contribute omega-3 fatty acids.`
       : 'No fat-specific ingredients detected.';
@@ -2065,6 +2115,8 @@ function decodeLabel(text) {
     missing.push('Paste the full ingredient list for a complete analysis — energy sources, fiber, fat, and protein sections cannot be evaluated from the guaranteed analysis alone.');
   }
 
+
+
   // NSC — only ask if not already detected/calculated
   const nscAlreadyKnown = analysis.nsc || (analysis.sugar && analysis.starch);
   if (!nscAlreadyKnown) {
@@ -2323,19 +2375,38 @@ function renderOutput(result) {
     if (introBlock) introBlock.style.display = 'block';
   }
 
+  // Render output cards — hide any that have no content
+  function setCard(id, html) {
+    const el = document.getElementById(id);
+    if (!el) return;
+    el.innerHTML = html || '';
+    // Hide the parent card if empty
+    const card = el.closest('.output-card');
+    if (card) card.style.display = (html && html.trim()) ? '' : 'none';
+  }
+
   document.getElementById('oc-feedtype').innerHTML  = result.feedtype;
   document.getElementById('oc-energy').innerHTML    = result.energy;
   document.getElementById('oc-protein').innerHTML   = result.protein;
   document.getElementById('oc-fiber').innerHTML     = result.fiber;
   document.getElementById('oc-fat').innerHTML       = result.fat;
-  document.getElementById('oc-sugar').innerHTML     = result.sugar;
-  document.getElementById('oc-vitamins').innerHTML  = result.vitamins;
-  document.getElementById('oc-digestive').innerHTML = result.digestive;
-  document.getElementById('oc-hoof').innerHTML      = result.hoof;
-  document.getElementById('oc-analysis').innerHTML  = result.analysis;
-  document.getElementById('oc-missing').innerHTML   = result.missing;
-  document.getElementById('oc-summary').innerHTML   = result.summary;
-  document.getElementById('oc-vet').innerHTML       = result.vet;
+  setCard('oc-sugar',     result.sugar);
+  setCard('oc-vitamins',  result.vitamins);
+  setCard('oc-digestive', result.digestive);
+  setCard('oc-hoof',      result.hoof);
+  setCard('oc-analysis',  result.analysis);
+  setCard('oc-missing',   result.missing);
+  setCard('oc-summary',   result.summary);
+  setCard('oc-vet',       result.vet);
+
+  // Also apply setCard to the first group (now using direct innerHTML above)
+  // Re-apply hide logic to them
+  ['oc-feedtype','oc-energy','oc-protein','oc-fiber','oc-fat'].forEach(function(id) {
+    const el = document.getElementById(id);
+    if (!el) return;
+    const card = el.closest('.output-card');
+    if (card) card.style.display = (el.innerHTML && el.innerHTML.trim()) ? '' : 'none';
+  });
 
   const out = document.getElementById('decoderOutput');
   out.style.display = 'block';
