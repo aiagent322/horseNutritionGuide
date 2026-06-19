@@ -5,7 +5,235 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>Horse Feed Label Decoder | HorseNutritionGuide.com</title>
   <meta name="description" content="Photograph any horse feed label and get a plain-English breakdown of every ingredient and guaranteed analysis value. Free, mobile-friendly, educational." />
-  <link rel="stylesheet" href="styles.css" />
+  <style id="critical-css">
+/* ============================================
+   HorseNutritionGuide.com — styles.css
+   Mobile-first. Camera is the hero.
+   ============================================ */
+
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+:root {
+  --green-deep:   #1C3A2F;
+  --green-mid:    #2D5C47;
+  --green-light:  #3D7A5E;
+  --green-pale:   #E8F2ED;
+  --cream:        #F8F4EE;
+  --cream-dark:   #EDE7DB;
+  --amber:        #C8821A;
+  --amber-light:  #E09A35;
+  --amber-pale:   #FBF0DC;
+  --caution:      #8B2E00;
+  --caution-bg:   #FDF3EE;
+  --ask-blue:     #1A3A5C;
+  --ask-bg:       #EDF3FB;
+  --text-dark:    #1A1A18;
+  --text-mid:     #3D3D38;
+  --text-light:   #6B6B64;
+  --white:        #FFFFFF;
+  --shadow-sm:    0 1px 4px rgba(28,58,47,0.10);
+  --shadow-md:    0 4px 16px rgba(28,58,47,0.13);
+  --radius:       10px;
+  --radius-lg:    16px;
+  --font-display: Georgia, 'Times New Roman', serif;
+  --font-body:    system-ui, -apple-system, 'Segoe UI', Arial, sans-serif;
+  --font-mono:    'Courier New', Courier, monospace;
+}
+
+html { scroll-behavior: smooth; }
+
+body {
+  font-family: var(--font-body);
+  background: var(--cream);
+  color: var(--text-dark);
+  line-height: 1.6;
+  font-size: 16px;
+}
+
+.container {
+  max-width: 680px;
+  margin: 0 auto;
+  padding: 0 20px;
+}
+
+h1, h2, h3, h4 {
+  font-family: var(--font-display);
+  font-weight: normal;
+  line-height: 1.2;
+  color: var(--green-deep);
+}
+
+p { color: var(--text-mid); margin-bottom: 1rem; }
+p:last-child { margin-bottom: 0; }
+ul { margin: 0.5rem 0 0 1.2rem; color: var(--text-mid); }
+ul li { margin-bottom: 0.35rem; }
+
+.section-eyebrow {
+  font-size: 0.72rem;
+  font-weight: 700;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--amber);
+  margin-bottom: 0.5rem;
+}
+
+.section-title { font-size: clamp(1.4rem, 4vw, 2rem); margin-bottom: 0.6rem; }
+.section-sub { color: var(--text-light); margin-bottom: 2rem; }
+
+/* --- BUTTONS --- */
+.btn {
+  display: inline-block;
+  font-family: var(--font-body);
+  font-weight: 600;
+  font-size: 1rem;
+  border-radius: var(--radius);
+  padding: 14px 24px;
+  cursor: pointer;
+  border: none;
+  text-decoration: none;
+  text-align: center;
+  transition: background 0.18s, transform 0.12s;
+  -webkit-tap-highlight-color: transparent;
+}
+.btn-full { width: 100%; display: block; }
+.btn-primary { background: var(--amber); color: var(--white); }
+.btn-primary:active { background: var(--amber-light); transform: scale(0.98); }
+.btn-secondary { background: var(--green-deep); color: var(--white); }
+.btn-secondary:active { background: var(--green-mid); }
+.btn-ghost { background: transparent; color: var(--text-light); border: 1.5px solid var(--cream-dark); }
+.btn-ghost:active { background: var(--cream-dark); }
+
+/* --- HEADER --- */
+.site-header {
+  background: var(--green-deep);
+  position: sticky;
+  top: 0;
+  z-index: 100;
+  box-shadow: 0 2px 8px rgba(0,0,0,0.2);
+}
+
+.header-inner {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 14px 20px;
+}
+
+.logo {
+  font-family: var(--font-display);
+  font-size: 1rem;
+  color: var(--cream);
+  text-decoration: none;
+  display: flex;
+  align-items: center;
+  gap: 7px;
+}
+.logo-mark { color: var(--amber); }
+.logo-dot  { color: var(--amber); }
+
+.header-link {
+  font-size: 0.83rem;
+  color: rgba(248,244,238,0.65);
+  text-decoration: none;
+}
+.header-link:hover { color: var(--cream); }
+
+/* --- MOBILE HERO --- */
+.hero-mobile {
+  background: var(--green-deep);
+  padding: 40px 20px 48px;
+  text-align: center;
+}
+
+.hero-mobile-inner {
+  max-width: 400px;
+  margin: 0 auto;
+}
+
+.hero-mobile-eyebrow {
+  font-size: 0.78rem;
+  font-weight: 700;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--amber-light);
+  margin-bottom: 12px;
+}
+
+.hero-mobile-headline {
+  font-size: clamp(2rem, 8vw, 3rem);
+  color: var(--cream);
+  margin-bottom: 12px;
+  line-height: 1.1;
+}
+
+.hero-mobile-sub {
+  font-size: 1rem;
+  color: rgba(248,244,238,0.75);
+  margin-bottom: 32px;
+}
+
+/* THE CAMERA CTA — the big tap target */
+.camera-cta {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  background: var(--amber);
+  color: var(--white);
+  border-radius: var(--radius-lg);
+  padding: 28px 24px;
+  cursor: pointer;
+  text-decoration: none;
+  width: 100%;
+  max-width: 360px;
+  margin: 0 auto 20px;
+  box-shadow: 0 4px 20px rgba(200,130,26,0.45);
+  transition: background 0.15s, transform 0.1s;
+  -webkit-tap-highlight-color: transparent;
+  user-select: none;
+}
+.camera-cta:active {
+  background: var(--amber-light);
+  transform: scale(0.97);
+}
+
+.camera-icon {
+  font-size: 2.8rem;
+  line-height: 1;
+  display: block;
+}
+
+.camera-label {
+  font-family: var(--font-display);
+  font-size: 1.35rem;
+  font-weight: normal;
+  color: var(--white);
+}
+
+.camera-sub {
+  font-size: 0.82rem;
+  color: rgba(255,255,255,0.8);
+}
+
+.hero-mobile-trust {
+  font-size: 0.78rem;
+  color: rgba(248,244,238,0.5);
+  margin: 0;
+}
+
+/* --- SCAN SECTION --- */
+
+  /* Show non-JS-dependent content immediately */
+  .js-loading .decoder-section { opacity: 0.4; pointer-events: none; }
+  .js-loading .scan-section { display: none !important; }
+  .js-loading .library-panel { opacity: 0.4; }
+  /* Remove loading state once JS runs */
+  body:not(.js-loading) { /* normal */ }
+  </style>
+  <link rel="stylesheet" href="styles.css" media="print" onload="this.media='all'" />
+  <noscript><link rel="stylesheet" href="styles.css" /></noscript>
+  <script>document.body.classList.remove('js-loading');</script>
 
   <link rel="canonical" href="https://horsenutritionguide.com/" />
   <meta property="og:title" content="Horse Feed Label Decoder | HorseNutritionGuide.com" />
@@ -26,8 +254,10 @@
     "isPartOf": { "@type": "WebSite", "name": "HorseNutritionGuide.com", "url": "https://horsenutritionguide.com" }
   }
   </script>
+  <link rel="preconnect" href="https://horse-nutrition-ocr.bridleandbit.workers.dev" />
+  <link rel="dns-prefetch" href="https://horse-nutrition-ocr.bridleandbit.workers.dev" />
 </head>
-<body>
+<body class="js-loading">
 
   <!-- HEADER — minimal, mobile-first -->
   <header class="site-header">
@@ -468,8 +698,9 @@
     </div>
   </footer>
 
-  <script src="feed-library.js"></script>
-  <script src="ration-builder.js"></script>
-  <script src="script.js"></script>
+  <script src="feed-library.js" defer></script>
+  <script src="ration-builder.js" defer></script>
+  <script src="script.js" defer></script>
+  <script src="auto-linker.js" defer></script>
 </body>
 </html>
