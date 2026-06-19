@@ -1,0 +1,8 @@
+# Canonical redirects
+/how-to-read-a-horse-feed-label  /how-to-read-horse-feed-label.html  301
+/label-guide                     /how-to-read-horse-feed-label.html  301
+/feed-matchmaker                 /matchmaker.html                     301
+/feed-glossary                   /glossary.html                       301
+
+# 404 fallback
+/*  /404.html  404
