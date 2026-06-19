@@ -1604,3 +1604,15 @@ ul li { margin-bottom: 0.35rem; }
   .scan-recovery-actions { flex-direction: column; }
   .scan-recovery-actions .btn { width: 100%; }
 }
+
+/* ── Auto-link styles */
+.auto-link {
+  color: var(--green-mid);
+  text-decoration: none;
+  border-bottom: 1px dotted var(--green-mid);
+  font-weight: inherit;
+}
+.auto-link:hover {
+  color: var(--green-deep);
+  border-bottom-style: solid;
+}
