@@ -2515,7 +2515,7 @@ document.addEventListener('DOMContentLoaded', function () {
       if (ocrScanBtn) { ocrScanBtn.disabled = false; ocrScanBtn.textContent = 'Read This Label'; }
 
       if (!rawText || rawText === 'UNREADABLE' || rawText.length < 15) {
-        showError('The label could not be read from this photo. Make sure the label is flat, well-lit, and in focus. Try cropping close to the ingredient list and guaranteed analysis panel, then try again.');
+        showError('The photo didn\'t contain enough readable text. The most common fixes: get closer to the label (8–12 inches), make sure it\'s in focus, and aim at the ingredient list + guaranteed analysis panel — not the front of the bag.');
         return;
       }
 
@@ -2548,6 +2548,89 @@ document.addEventListener('DOMContentLoaded', function () {
 
   document.addEventListener('DOMContentLoaded', function () {
     ocrFileInput    = document.getElementById('ocrFileInput');
+
+    // ── Retry input (shown in error state)
+    const ocrRetryInput = document.getElementById('ocrRetryInput');
+    if (ocrRetryInput) {
+      ocrRetryInput.addEventListener('change', function (e) {
+        if (e.target.files && e.target.files[0]) {
+          selectedFile = e.target.files[0];
+          const reader = new FileReader();
+          reader.onload = function (ev) {
+            if (ocrPreviewImg) ocrPreviewImg.src = ev.target.result;
+            hide(document.getElementById('ocrErrorMsg'));
+            show(scanSection);
+            setTimeout(runOCR, 400);
+          };
+          reader.readAsDataURL(selectedFile);
+        }
+      });
+    }
+
+    // ── "Search by Feed Name" fallback button
+    const searchInsteadBtn = document.getElementById('scanSearchInsteadBtn');
+    const fallbackSearch   = document.getElementById('scanFallbackSearch');
+    const fallbackDropdown = document.getElementById('scanFallbackDropdown');
+    const fallbackLoadBtn  = document.getElementById('scanFallbackLoadBtn');
+
+    if (searchInsteadBtn && fallbackSearch) {
+      // Populate fallback dropdown
+      if (fallbackDropdown && typeof FEED_LABEL_LIBRARY !== 'undefined') {
+        const names = Object.keys(FEED_LABEL_LIBRARY).sort();
+        const brands = {};
+        names.forEach(function(n) {
+          const brand = n.split(' ')[0] === 'Triple' ? 'Triple Crown' :
+                        ['Nutrena','Purina','Standlee','Buckeye','Seminole','Tribute'].includes(n.split(' ')[0])
+                        ? n.split(' ')[0] : 'Other';
+          if (!brands[brand]) brands[brand] = [];
+          brands[brand].push(n);
+        });
+        Object.keys(brands).sort().forEach(function(brand) {
+          const og = document.createElement('optgroup');
+          og.label = brand;
+          brands[brand].forEach(function(name) {
+            const opt = document.createElement('option');
+            opt.value = name;
+            opt.textContent = name;
+            og.appendChild(opt);
+          });
+          fallbackDropdown.appendChild(og);
+        });
+      }
+
+      searchInsteadBtn.addEventListener('click', function() {
+        fallbackSearch.style.display = 'block';
+        fallbackDropdown.focus();
+        this.style.display = 'none';
+      });
+
+      if (fallbackLoadBtn) {
+        fallbackLoadBtn.addEventListener('click', function() {
+          const name = fallbackDropdown.value;
+          if (!name || typeof FEED_LABEL_LIBRARY === 'undefined') return;
+          const text = FEED_LABEL_LIBRARY[name];
+          if (!text) return;
+          // Load into main textarea
+          const feedInput = document.getElementById('feedInput');
+          if (feedInput) feedInput.value = text;
+          // Set main dropdown too
+          const mainDropdown = document.getElementById('libraryDropdown');
+          if (mainDropdown) mainDropdown.value = name;
+          // Show status
+          const statusMsg = document.getElementById('libraryStatusMsg');
+          if (statusMsg) { statusMsg.textContent = '✓ ' + name + ' loaded from library.'; statusMsg.style.display = 'block'; }
+          // Hide error, scroll to decoder
+          hide(document.getElementById('ocrErrorMsg'));
+          hide(scanSection);
+          const decoder = document.getElementById('decoder');
+          if (decoder) decoder.scrollIntoView({ behavior: 'smooth', block: 'start' });
+          setTimeout(function() {
+            const decodeBtn = document.getElementById('decodeBtn');
+            if (decodeBtn) decodeBtn.click();
+          }, 500);
+        });
+      }
+    }
     ocrFileInput2   = document.getElementById('ocrFileInput2');
     ocrPreviewImg   = document.getElementById('ocrPreviewImg');
     ocrRemoveBtn    = document.getElementById('ocrRemoveBtn');

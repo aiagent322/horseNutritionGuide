@@ -40,36 +40,80 @@
     </div>
   </section>
 
+  <!-- PHOTO TIPS — shown above camera button on mobile -->
+  <div class="scan-tips-bar" id="scanTipsBar">
+    <div class="scan-tips-inner">
+      <span class="scan-tips-icon">&#128247;</span>
+      <span class="scan-tips-text">For best results: <strong>lay the bag flat</strong>, get <strong>close to the label</strong>, make sure it's <strong>in focus</strong> and <strong>well lit</strong>. Capture the full ingredient list and guaranteed analysis panel in one shot.</span>
+    </div>
+  </div>
+
   <!-- OCR STATUS + PREVIEW (shown after photo taken) -->
   <section class="scan-section" id="scanSection" style="display:none;">
     <div class="container">
 
+      <!-- Photo preview -->
       <div class="scan-preview-wrap" id="scanPreviewWrap">
         <img id="ocrPreviewImg" class="scan-preview-img" alt="Feed label photo" />
-        <button class="scan-remove-btn" id="ocrRemoveBtn">&#10005; Use a different photo</button>
-      </div>
-
-      <div class="scan-status" id="ocrStatus" style="display:none;">
-        <div class="scan-spinner"></div>
-        <div>
-          <div class="scan-status-text" id="ocrStatusText">Reading label…</div>
-          <div class="scan-progress-wrap" id="ocrProgressWrap" style="display:none;">
-            <div class="scan-progress-bar">
-              <div class="scan-progress-fill" id="ocrProgressFill" style="width:0%"></div>
-            </div>
-            <div class="scan-progress-label" id="ocrProgressLabel">0%</div>
-          </div>
+        <div class="scan-preview-actions">
+          <button class="scan-remove-btn" id="ocrRemoveBtn">&#10005; Use a different photo</button>
+          <button class="btn btn-primary scan-read-btn" id="ocrScanBtn" style="display:none;">&#128269; Read This Label</button>
         </div>
       </div>
 
-      <button class="btn btn-primary btn-full" id="ocrScanBtn" style="display:none;">Read This Label</button>
-
-      <div class="scan-result-msg" id="ocrResultMsg" style="display:none;">
-        <span>&#10003;</span> Label read. Scroll down to see your breakdown — or edit the text below first.
+      <!-- Reading status -->
+      <div class="scan-status" id="ocrStatus" style="display:none;">
+        <div class="scan-spinner"></div>
+        <div>
+          <div class="scan-status-text" id="ocrStatusText">Reading label… takes about 10 seconds</div>
+          <div class="scan-status-sub">Analyzing ingredient list and guaranteed analysis panel</div>
+        </div>
       </div>
 
-      <div class="scan-error-msg" id="ocrErrorMsg" style="display:none;">
-        <span>&#9888;</span> <span id="ocrErrorText"></span>
+      <!-- Success -->
+      <div class="scan-result-msg" id="ocrResultMsg" style="display:none;">
+        <span class="scan-result-icon">&#10003;</span>
+        <div>
+          <div class="scan-result-title">Label read successfully</div>
+          <div class="scan-result-sub">Scrolling to your breakdown — or edit the text below first if anything looks off.</div>
+        </div>
+      </div>
+
+      <!-- Error with recovery options -->
+      <div class="scan-error-wrap" id="ocrErrorMsg" style="display:none;">
+        <div class="scan-error-header">
+          <span class="scan-error-icon">&#9888;</span>
+          <span class="scan-error-title">Couldn't read this photo</span>
+        </div>
+        <div class="scan-error-reason" id="ocrErrorText"></div>
+
+        <!-- Photo tips on failure -->
+        <div class="scan-retry-tips" id="scanRetryTips">
+          <div class="scan-retry-tips-title">Common causes &amp; fixes:</div>
+          <div class="scan-tip-row"><span class="scan-tip-icon">&#128161;</span><span><strong>Too dark</strong> — move to better light or turn on your phone's flashlight before shooting</span></div>
+          <div class="scan-tip-row"><span class="scan-tip-icon">&#128269;</span><span><strong>Out of focus</strong> — tap the label on your screen to focus before shooting, hold still</span></div>
+          <div class="scan-tip-row"><span class="scan-tip-icon">&#128196;</span><span><strong>Too far away</strong> — get within 8–12 inches of the label, fill the frame with the text</span></div>
+          <div class="scan-tip-row"><span class="scan-tip-icon">&#128256;</span><span><strong>Wrinkled or curved bag</strong> — lay the bag flat on a surface, smooth the label</span></div>
+          <div class="scan-tip-row"><span class="scan-tip-icon">&#9986;</span><span><strong>Capture the right panel</strong> — aim at the ingredient list + guaranteed analysis, not the front of the bag</span></div>
+        </div>
+
+        <!-- Recovery actions -->
+        <div class="scan-recovery-actions">
+          <label class="btn btn-primary scan-retry-btn" for="ocrRetryInput">
+            &#128247; Try Again
+            <input type="file" id="ocrRetryInput" accept="image/*" capture="environment" style="display:none;" />
+          </label>
+          <button class="btn btn-secondary" id="scanSearchInsteadBtn">&#128218; Search by Feed Name</button>
+        </div>
+
+        <!-- Inline library search on failure -->
+        <div class="scan-fallback-search" id="scanFallbackSearch" style="display:none;">
+          <div class="scan-fallback-label">Search our verified label library — no photo needed:</div>
+          <select id="scanFallbackDropdown" class="library-dropdown scan-fallback-dropdown">
+            <option value="">— Choose your feed —</option>
+          </select>
+          <button class="btn btn-library scan-fallback-load" id="scanFallbackLoadBtn">Load &amp; Decode</button>
+        </div>
       </div>
 
     </div>

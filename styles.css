@@ -1443,3 +1443,164 @@ ul li { margin-bottom: 0.35rem; }
   font-size: 0.92rem;
   color: var(--text-mid);
 }
+
+/* ============================================
+   MOBILE CAMERA UX — SCAN TIPS + ERROR RECOVERY
+   ============================================ */
+
+/* Pre-shoot tips bar */
+.scan-tips-bar {
+  background: rgba(28,58,47,0.06);
+  border-bottom: 1px solid rgba(28,58,47,0.1);
+  padding: 10px 16px;
+}
+.scan-tips-inner {
+  max-width: 600px;
+  margin: 0 auto;
+  display: flex;
+  gap: 10px;
+  align-items: flex-start;
+  font-size: 0.82rem;
+  color: #3D3D38;
+  line-height: 1.5;
+}
+.scan-tips-icon { font-size: 1.1rem; flex-shrink: 0; margin-top: 1px; }
+
+/* Preview actions row */
+.scan-preview-actions {
+  display: flex;
+  gap: 10px;
+  align-items: center;
+  margin-top: 10px;
+  flex-wrap: wrap;
+}
+.scan-read-btn {
+  flex: 1;
+  min-height: 44px;
+}
+
+/* Status sub-line */
+.scan-status-sub {
+  font-size: 0.8rem;
+  color: rgba(28,58,47,0.6);
+  margin-top: 3px;
+}
+
+/* Success message */
+.scan-result-msg {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  background: #F0F9F4;
+  border: 1px solid #C5DDD0;
+  border-radius: var(--radius-sm);
+  padding: 14px 16px;
+  margin-top: 12px;
+}
+.scan-result-icon {
+  font-size: 1.3rem;
+  color: #2D5C47;
+  flex-shrink: 0;
+}
+.scan-result-title {
+  font-weight: 700;
+  color: #1C3A2F;
+  font-size: 0.92rem;
+}
+.scan-result-sub {
+  font-size: 0.8rem;
+  color: #5C5C54;
+  margin-top: 2px;
+}
+
+/* Error wrap — full recovery UI */
+.scan-error-wrap {
+  background: #FDF3EE;
+  border: 1.5px solid rgba(200,130,26,0.35);
+  border-radius: var(--radius-sm);
+  padding: 16px;
+  margin-top: 12px;
+}
+.scan-error-header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 8px;
+}
+.scan-error-icon { font-size: 1.2rem; }
+.scan-error-title {
+  font-weight: 700;
+  color: #8B4A00;
+  font-size: 0.95rem;
+}
+.scan-error-reason {
+  font-size: 0.85rem;
+  color: #5C3A1A;
+  line-height: 1.55;
+  margin-bottom: 14px;
+  padding-bottom: 14px;
+  border-bottom: 1px solid rgba(200,130,26,0.15);
+}
+
+/* Photo tips on error */
+.scan-retry-tips {
+  margin-bottom: 16px;
+}
+.scan-retry-tips-title {
+  font-size: 0.78rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: #8B4A00;
+  margin-bottom: 10px;
+}
+.scan-tip-row {
+  display: flex;
+  gap: 10px;
+  align-items: flex-start;
+  font-size: 0.83rem;
+  color: #3D3D38;
+  line-height: 1.5;
+  margin-bottom: 8px;
+}
+.scan-tip-icon { flex-shrink: 0; font-size: 1rem; }
+
+/* Recovery buttons */
+.scan-recovery-actions {
+  display: flex;
+  gap: 10px;
+  flex-wrap: wrap;
+  margin-bottom: 14px;
+}
+.scan-recovery-actions .btn { flex: 1; min-width: 130px; min-height: 44px; text-align: center; }
+.scan-retry-btn { cursor: pointer; }
+
+/* Inline fallback library search */
+.scan-fallback-search {
+  background: rgba(28,58,47,0.06);
+  border-radius: var(--radius-sm);
+  padding: 12px 14px;
+  margin-top: 4px;
+}
+.scan-fallback-label {
+  font-size: 0.82rem;
+  font-weight: 600;
+  color: #1C3A2F;
+  margin-bottom: 8px;
+}
+.scan-fallback-dropdown {
+  width: 100%;
+  margin-bottom: 8px;
+  background: white;
+  color: #1C3A2F;
+  border-color: #C5DDD0;
+}
+.scan-fallback-load {
+  width: 100%;
+  min-height: 44px;
+}
+
+@media (max-width: 480px) {
+  .scan-recovery-actions { flex-direction: column; }
+  .scan-recovery-actions .btn { width: 100%; }
+}
