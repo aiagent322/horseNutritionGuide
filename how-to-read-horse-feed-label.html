@@ -1,0 +1,479 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>How to Read a Horse Feed Label — Step by Step</title>
+  <meta name="description" content="A complete guide to reading every part of a horse feed label: ingredient list, guaranteed analysis, NSC, ADF, NDF, and what each number means for your horse." />
+  <link rel="canonical" href="https://horsenutritionguide.com/how-to-read-horse-feed-label" />
+  <link rel="stylesheet" href="styles.css" media="print" onload="this.media='all'" />
+  <noscript><link rel="stylesheet" href="styles.css" /></noscript>
+  <meta property="og:title" content="How to Read a Horse Feed Label — Step by Step" />
+  <meta property="og:description" content="A complete guide to reading every part of a horse feed label: ingredient list, guaranteed analysis, NSC, ADF, NDF, and what each number means for your horse." />
+  <meta property="og:url" content="https://horsenutritionguide.com/how-to-read-horse-feed-label" />
+  <meta property="og:type" content="article" />
+  <meta property="og:site_name" content="HorseNutritionGuide.com" />
+  <script type="application/ld+json">
+  {
+    "@context": "https://schema.org",
+    "@type": "HowTo",
+    "name": "How to Read a Horse Feed Label",
+    "description": "A step-by-step guide to understanding every section of a commercial horse feed label, from ingredient list to guaranteed analysis.",
+    "url": "https://horsenutritionguide.com/how-to-read-horse-feed-label",
+    "step": [
+      {"@type":"HowToStep","name":"Read the ingredient list first","text":"The ingredient list tells you what the feed actually IS. Ingredients are listed in descending order by weight — the first ingredient is present in the largest amount."},
+      {"@type":"HowToStep","name":"Identify the energy source","text":"Look at the first 3 ingredients. If beet pulp, soybean hulls, or alfalfa lead — it's a fiber-based feed. If corn, oats, or barley lead — it's a grain-based feed."},
+      {"@type":"HowToStep","name":"Find the Guaranteed Analysis panel","text":"This required panel lists Crude Protein (min), Crude Fat (min), Crude Fiber (max), ADF, NDF, and often Calcium, Phosphorus, Selenium, Copper, Zinc, and Vitamins A, D, and E."},
+      {"@type":"HowToStep","name":"Calculate NSC","text":"If NSC is not listed, add Starch (max) + Sugar (max) to estimate it. Below 10% is low-starch; above 20% is grain-forward."},
+      {"@type":"HowToStep","name":"Check selenium","text":"Selenium is expressed in ppm. Keep total daily selenium from all sources below 2 mg/day. Multiply ppm × daily kg fed = mg from this feed."},
+      {"@type":"HowToStep","name":"Check the Ca:P ratio","text":"Divide the calcium minimum by the phosphorus minimum. The ratio should be 1.5–2:1 (calcium to phosphorus). An inverted ratio causes calcium deficiency."}
+    ],
+    "publisher": {"@type":"Organization","name":"HorseNutritionGuide.com","url":"https://horsenutritionguide.com"}
+  }
+  </script>
+  <script type="application/ld+json">
+  {
+    "@context": "https://schema.org",
+    "@type": "FAQPage",
+    "mainEntity": [
+      {"@type":"Question","name":"What does the ingredient list on horse feed tell you?","acceptedAnswer":{"@type":"Answer","text":"The ingredient list shows every ingredient in the feed in descending order by weight before processing. The first ingredient is the largest component. If beet pulp is first, this is primarily a fiber feed. If corn is first, it is primarily a grain feed."}},
+      {"@type":"Question","name":"What is NSC on a horse feed label?","acceptedAnswer":{"@type":"Answer","text":"NSC stands for Non-Structural Carbohydrates — the sum of starch and sugar in the feed. It is the most important number for horses with EMS, insulin resistance, laminitis, PPID/Cushing's, or PSSM. These horses need total diet NSC below 10%. If NSC is not listed, calculate it by adding the listed Starch (max) and Sugar (max) values."}},
+      {"@type":"Question","name":"What do minimum and maximum guarantees mean on horse feed labels?","acceptedAnswer":{"@type":"Answer","text":"Minimum guarantees (like Crude Protein min) mean the feed contains at least that amount — it may contain more. Maximum guarantees (like Crude Fiber max) mean the feed contains no more than that amount — it may contain less. The actual value can be anywhere within those bounds."}},
+      {"@type":"Question","name":"What is ADF and NDF on a horse feed label?","acceptedAnswer":{"@type":"Answer","text":"ADF (Acid Detergent Fiber) measures the least digestible fiber fractions — cellulose and lignin. Higher ADF means lower digestible energy. NDF (Neutral Detergent Fiber) measures total structural fiber including hemicellulose. Higher NDF means more gut fill and slower passage. Both are required on AAFCO-compliant horse feed labels."}},
+      {"@type":"Question","name":"How do I check selenium on a horse feed label?","acceptedAnswer":{"@type":"Answer","text":"Selenium is listed in ppm (parts per million) in the guaranteed analysis. To calculate daily mg intake: multiply ppm by the daily feeding rate in kilograms (lbs ÷ 2.2 = kg). Keep total daily selenium from all sources — feed, hay, and supplements combined — below 2 mg per day."}},
+      {"@type":"Question","name":"What is the correct calcium to phosphorus ratio for horses?","acceptedAnswer":{"@type":"Answer","text":"The recommended Ca:P ratio for horses is 1.5 to 2:1 — calcium to phosphorus. An inverted ratio where phosphorus exceeds calcium causes the horse to mobilize calcium from bone, leading to skeletal problems. Grains are naturally phosphorus-heavy; alfalfa and limestone are calcium-heavy. Commercial feeds balance these with dicalcium phosphate and limestone."}}
+    ]
+  }
+  </script>
+  <style>
+    .guide-hero { background: linear-gradient(135deg,#1C3A2F,#2D5C47); padding:40px 20px 32px; }
+    .guide-hero h1 { color:#F8F4EE; font-size:clamp(1.5rem,5vw,2.2rem); margin-bottom:10px; max-width:640px; }
+    .guide-hero p { color:rgba(248,244,238,0.78); font-size:0.95rem; max-width:560px; margin:0 0 20px; }
+    .guide-hero-cta { display:inline-flex; align-items:center; gap:8px; padding:11px 20px; background:#C8821A; color:#fff; border-radius:7px; text-decoration:none; font-weight:700; font-size:0.9rem; }
+    .guide-body { max-width:720px; margin:0 auto; padding:32px 18px 64px; }
+    .guide-toc { background:#F2F7F4; border:1px solid #C5DDD0; border-radius:10px; padding:18px 20px; margin-bottom:32px; }
+    .guide-toc-title { font-size:0.78rem; font-weight:700; text-transform:uppercase; letter-spacing:0.1em; color:#2D5C47; margin-bottom:12px; }
+    .guide-toc ol { margin:0; padding-left:20px; }
+    .guide-toc li { margin-bottom:6px; font-size:0.88rem; }
+    .guide-toc a { color:#2D5C47; text-decoration:none; font-weight:600; }
+    .guide-toc a:hover { text-decoration:underline; }
+    .guide-step { margin-bottom:48px; scroll-margin-top:20px; }
+    .guide-step-num { display:inline-flex; align-items:center; justify-content:center; width:32px; height:32px; background:#1C3A2F; color:#F8F4EE; border-radius:50%; font-size:0.88rem; font-weight:700; flex-shrink:0; margin-bottom:12px; }
+    .guide-step h2 { font-size:1.3rem; color:#1C3A2F; margin:0 0 14px; line-height:1.3; }
+    .guide-step p { font-size:0.95rem; line-height:1.78; color:#3D3D38; margin-bottom:14px; }
+    .guide-step strong { color:#1C3A2F; }
+    .guide-callout { border-radius:8px; padding:14px 16px; margin:16px 0; font-size:0.9rem; line-height:1.65; }
+    .callout-green { background:#F0F9F4; border-left:4px solid #2D5C47; color:#1C3A2F; }
+    .callout-amber { background:#FBF0DC; border-left:4px solid #C8821A; color:#5C3A1A; }
+    .callout-red   { background:#FDF0EE; border-left:4px solid #8B2E00; color:#8B2E00; }
+    .guide-label-example { background:#FAFAF5; border:1.5px solid #D5E8DD; border-radius:10px; padding:18px 20px; margin:20px 0; font-family:monospace; font-size:0.82rem; line-height:1.8; color:#1A1A18; }
+    .guide-label-example .label-section { font-weight:700; color:#2D5C47; font-size:0.78rem; text-transform:uppercase; letter-spacing:0.1em; margin-bottom:6px; margin-top:14px; }
+    .guide-label-example .label-section:first-child { margin-top:0; }
+    .label-highlight { background:#FFFDE8; padding:0 3px; border-radius:2px; }
+    .label-bad { background:#FDF0EE; padding:0 3px; border-radius:2px; }
+    .guide-table { width:100%; border-collapse:collapse; font-size:0.85rem; margin:16px 0; }
+    .guide-table th { background:#F2F7F4; color:#1C3A2F; font-weight:700; padding:8px 12px; text-align:left; border-bottom:2px solid #C5DDD0; }
+    .guide-table td { padding:8px 12px; border-bottom:1px solid #EEEAE4; color:#3D3D38; vertical-align:top; }
+    .guide-table tr:last-child td { border-bottom:none; }
+    .guide-table td:first-child { font-weight:600; color:#1C3A2F; white-space:nowrap; }
+    .guide-divider { border:none; border-top:1px solid #EEEAE4; margin:40px 0; }
+    .guide-cta-box { background:linear-gradient(135deg,#1C3A2F,#2D5C47); border-radius:12px; padding:24px 22px; margin:32px 0; text-align:center; }
+    .guide-cta-box h3 { color:#F8F4EE; margin:0 0 8px; font-size:1.05rem; }
+    .guide-cta-box p { color:rgba(248,244,238,0.72); font-size:0.87rem; margin:0 0 16px; }
+    .guide-cta-btns { display:flex; gap:10px; justify-content:center; flex-wrap:wrap; }
+    .guide-cta-btn { padding:10px 20px; border-radius:7px; text-decoration:none; font-weight:700; font-size:0.88rem; }
+    .gcb-primary { background:#C8821A; color:#fff; }
+    .gcb-secondary { background:rgba(255,255,255,0.12); border:1px solid rgba(255,255,255,0.25); color:#F8F4EE; }
+    .back-link { display:inline-flex; align-items:center; gap:6px; color:#2D5C47; font-size:0.85rem; font-weight:600; text-decoration:none; margin-bottom:28px; }
+    .back-link:hover { text-decoration:underline; }
+    @media(max-width:480px){ .guide-cta-btns{flex-direction:column;} .guide-cta-btn{text-align:center;} }
+  </style>
+</head>
+<body>
+
+<header class="site-header">
+  <div class="container header-inner">
+    <a href="index.html" class="logo"><span class="logo-mark">&#9670;</span>HorseNutritionGuide<span class="logo-dot">.com</span></a>
+    <a href="glossary.html" class="header-link">Glossary</a>
+    <a href="matchmaker.html" class="header-link" style="background:#C8821A;color:white;padding:5px 12px;border-radius:6px;">&#127775; Matchmaker</a>
+  </div>
+</header>
+
+<div class="guide-hero">
+  <div class="container">
+    <h1>How to Read a Horse Feed Label</h1>
+    <p>A complete step-by-step guide to understanding every section — ingredient list, guaranteed analysis, NSC, ADF, NDF, selenium, vitamins, and what each number actually means for your horse.</p>
+    <a href="index.html" class="guide-hero-cta">&#128247; Decode any label instantly</a>
+  </div>
+</div>
+
+<div class="guide-body">
+  <a href="index.html" class="back-link">&#8592; Back to Feed Decoder</a>
+
+  <!-- TABLE OF CONTENTS -->
+  <div class="guide-toc">
+    <div class="guide-toc-title">In this guide</div>
+    <ol>
+      <li><a href="#ingredient-list">The Ingredient List — what the feed actually IS</a></li>
+      <li><a href="#energy-source">Identifying the energy source</a></li>
+      <li><a href="#guaranteed-analysis">The Guaranteed Analysis panel</a></li>
+      <li><a href="#nsc">NSC — the most important number for metabolic horses</a></li>
+      <li><a href="#adf-ndf">ADF and NDF — understanding fiber</a></li>
+      <li><a href="#selenium">Selenium — safe range and forms</a></li>
+      <li><a href="#vitamins">Vitamins A, D, and E</a></li>
+      <li><a href="#calcium-phosphorus">Calcium and phosphorus ratio</a></li>
+      <li><a href="#trace-minerals">Trace minerals — copper, zinc, manganese</a></li>
+      <li><a href="#red-flags">Red flags to look for</a></li>
+      <li><a href="#what-to-ask">What to ask the manufacturer</a></li>
+    </ol>
+  </div>
+
+  <!-- STEP 1 -->
+  <div class="guide-step" id="ingredient-list">
+    <div class="guide-step-num">1</div>
+    <h2>The Ingredient List — what the feed actually is</h2>
+
+    <p>Start here, not with the front of the bag. The ingredient list on the back or side panel tells you what the feed is actually made of. By law in the United States, ingredients must be listed in <strong>descending order by weight before processing</strong> — the first ingredient is present in the largest amount, and each subsequent ingredient is smaller than the one before it.</p>
+
+    <p>The first three ingredients define the character of the feed. They represent the bulk of what your horse is eating.</p>
+
+    <div class="guide-callout callout-green">
+      <strong>Fiber-first ingredients</strong> (beet pulp, soybean hulls, alfalfa meal, wheat middlings) — indicate a lower-starch, hindgut-friendly feed. Good for easy keepers, metabolic horses, seniors, and horses prone to digestive upset.
+    </div>
+
+    <div class="guide-callout callout-amber">
+      <strong>Grain-first ingredients</strong> (corn, oats, barley, wheat) — indicate a starch-forward feed. Appropriate for horses in hard work that need quick-burning energy, but not appropriate for horses with EMS, insulin resistance, laminitis history, PPID/Cushing's, or PSSM without specific guidance.
+    </div>
+
+    <div class="guide-label-example">
+      <div class="label-section">Example A — Fiber-Based Feed</div>
+      <span class="label-highlight">Soybean Hulls</span>, <span class="label-highlight">Dried Beet Pulp</span>, <span class="label-highlight">Dehydrated Alfalfa Meal</span>, Soybean Meal, Wheat Middlings, Ground Flax Seed, Soybean Oil, Cane Molasses, Calcium Carbonate, Salt, Yeast Culture, Biotin, L-Lysine, DL-Methionine...
+      <br><br>
+      <em>✓ Fiber-first. Low starch. Appropriate for metabolic horses and easy keepers (note molasses — check NSC).</em>
+
+      <div class="label-section">Example B — Grain-Based Feed</div>
+      <span class="label-bad">Ground Corn</span>, <span class="label-bad">Oats</span>, <span class="label-bad">Wheat Middlings</span>, Soybean Meal, Cane Molasses, Calcium Carbonate, Salt, Vitamin E Supplement...
+      <br><br>
+      <em>⚠ Grain-first. High starch. Not appropriate for horses with EMS, laminitis, or PSSM.</em>
+    </div>
+
+    <p><strong>Ingredient position matters most for sugar sources.</strong> If molasses appears at position #2 or #3, it is a major ingredient. If it appears at position #10 or later, it is a small palatability addition. The same ingredient can be a concern or a non-issue depending on its position.</p>
+  </div>
+
+  <hr class="guide-divider" />
+
+  <!-- STEP 2 -->
+  <div class="guide-step" id="energy-source">
+    <div class="guide-step-num">2</div>
+    <h2>Identifying the energy source</h2>
+
+    <p>Horse feeds provide energy through three pathways, each with a very different effect on the horse's body:</p>
+
+    <table class="guide-table">
+      <thead><tr><th>Energy Source</th><th>Ingredients to Look For</th><th>Effect</th><th>Suitable For</th></tr></thead>
+      <tbody>
+        <tr>
+          <td>Digestible Fiber</td>
+          <td>Beet pulp, soybean hulls, alfalfa, timothy pellets, wheat middlings</td>
+          <td>Fermented slowly in hindgut → produces VFAs → steady sustained energy, minimal insulin spike</td>
+          <td>All horses, especially metabolic horses, easy keepers, seniors</td>
+        </tr>
+        <tr>
+          <td>Grain Starch</td>
+          <td>Corn, oats, barley, wheat, wheat middlings (when leading)</td>
+          <td>Digested quickly in small intestine → raises blood glucose → significant insulin response</td>
+          <td>Horses in heavy work needing quick energy — NOT metabolic horses</td>
+        </tr>
+        <tr>
+          <td>Fat</td>
+          <td>Vegetable oil, soybean oil, rice bran, flaxseed, stabilized fat supplements</td>
+          <td>2.25× more energy per gram than carbohydrates — no blood glucose spike</td>
+          <td>Hard keepers, performance horses, horses that need calories without starch</td>
+        </tr>
+      </tbody>
+    </table>
+
+    <p>The most useful question: <strong>is the first ingredient fiber or grain?</strong> That single fact tells you more about a feed than the brand name or any marketing claim on the front of the bag.</p>
+  </div>
+
+  <hr class="guide-divider" />
+
+  <!-- STEP 3 -->
+  <div class="guide-step" id="guaranteed-analysis">
+    <div class="guide-step-num">3</div>
+    <h2>The Guaranteed Analysis panel</h2>
+
+    <p>This panel is required on every commercial horse feed sold in the United States. It gives you the manufacturer's legal commitment to nutrient levels. Every number here is a guarantee — the feed must meet these levels in every bag.</p>
+
+    <p><strong>Understanding minimums vs maximums:</strong></p>
+    <ul style="font-size:0.93rem;line-height:1.8;color:#3D3D38;margin-bottom:16px;">
+      <li><strong>Minimum guarantee</strong> (Crude Protein min, Crude Fat min) — the feed contains <em>at least</em> this much. The actual amount may be higher.</li>
+      <li><strong>Maximum guarantee</strong> (Crude Fiber max, NSC max) — the feed contains <em>no more than</em> this much. The actual amount may be lower.</li>
+    </ul>
+
+    <table class="guide-table">
+      <thead><tr><th>Nutrient</th><th>What it means</th><th>Typical range</th><th>Watch for</th></tr></thead>
+      <tbody>
+        <tr><td>Crude Protein (min)</td><td>Total protein estimate based on nitrogen content. Quantity, not quality.</td><td>10–32%</td><td>High % in ration balancers is normal — they're fed in tiny amounts</td></tr>
+        <tr><td>Crude Fat (min)</td><td>Total fat content. Higher = more calories, more coat support.</td><td>3–22%</td><td>Above 8% = meaningfully high-fat formula</td></tr>
+        <tr><td>Crude Fiber (max)</td><td>Minimum indigestible fiber. Higher = more forage character.</td><td>8–35%</td><td>Above 18% = complete feed or forage supplement</td></tr>
+        <tr><td>ADF (max)</td><td>Least digestible fiber. Higher ADF = lower energy.</td><td>10–38%</td><td>Above 25% = significant forage character</td></tr>
+        <tr><td>NDF (max)</td><td>Total structural fiber. Higher = more gut fill, slower passage.</td><td>20–60%</td><td>Above 35% = forage-like feed</td></tr>
+        <tr><td>Calcium (min/max)</td><td>Both a min and max are required. Important for bone and muscle.</td><td>0.5–2.0%</td><td>Check ratio to phosphorus (should be 1.5–2:1, Ca:P)</td></tr>
+        <tr><td>Phosphorus (min)</td><td>Bone mineralization, energy metabolism. Must be below calcium.</td><td>0.4–1.0%</td><td>Phosphorus must not exceed calcium in the total diet</td></tr>
+        <tr><td>Selenium (min)</td><td>Antioxidant trace mineral. Very narrow safe range.</td><td>0.2–0.6 ppm</td><td>Total from all sources must stay below 2 mg/day</td></tr>
+        <tr><td>Vitamin E (min)</td><td>Fat-soluble antioxidant. Critical for muscle and nerve health.</td><td>50–500 IU/lb</td><td>Horses without pasture need ≥1,000 IU/day total</td></tr>
+        <tr><td>Vitamin A (min)</td><td>Vision, immune function, reproduction. Can be toxic in excess.</td><td>2,000–15,000 IU/lb</td><td>Don't stack multiple fortified feeds + supplements</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <hr class="guide-divider" />
+
+  <!-- STEP 4 -->
+  <div class="guide-step" id="nsc">
+    <div class="guide-step-num">4</div>
+    <h2>NSC — the most important number for metabolic horses</h2>
+
+    <p>NSC stands for Non-Structural Carbohydrates — the sum of all starch and sugar in the feed. It is the single most important number for any horse with:</p>
+    <ul style="font-size:0.93rem;line-height:1.8;color:#3D3D38;margin-bottom:14px;">
+      <li><strong>EMS (Equine Metabolic Syndrome)</strong> — insulin resistance caused by cells failing to respond to insulin</li>
+      <li><strong>Insulin Resistance (IR)</strong> — the underlying mechanism of EMS</li>
+      <li><strong>PPID / Cushing's Disease</strong> — hormonal disorder causing insulin dysregulation</li>
+      <li><strong>Laminitis or founder history</strong> — often triggered by high-insulin episodes</li>
+      <li><strong>PSSM</strong> — muscle glycogen disorder worsened by starch intake</li>
+    </ul>
+
+    <p>For these horses, total diet NSC should stay below 10%. For healthy horses in work, NSC below 20% is generally fine.</p>
+
+    <div class="guide-callout callout-amber">
+      <strong>NSC is often not listed on the label.</strong> If it's missing, calculate it yourself: <strong>Starch (max) + Sugar (max) = estimated NSC</strong>. This gives the worst-case value, which is what matters for metabolic horses. If neither starch nor sugar is listed, contact the manufacturer — they are required to test and can provide this data.
+    </div>
+
+    <table class="guide-table">
+      <thead><tr><th>NSC Level</th><th>Classification</th><th>Suitable for</th></tr></thead>
+      <tbody>
+        <tr><td>Below 10%</td><td>Low NSC</td><td>All horses including EMS, PPID, laminitis, PSSM</td></tr>
+        <tr><td>10–15%</td><td>Moderate NSC</td><td>Healthy horses, light to moderate work — use caution with metabolic horses</td></tr>
+        <tr><td>15–20%</td><td>Moderate-high NSC</td><td>Horses in active work — not appropriate for metabolic horses</td></tr>
+        <tr><td>Above 20%</td><td>High NSC</td><td>Performance horses in heavy training — not for easy keepers or metabolic horses</td></tr>
+      </tbody>
+    </table>
+
+    <p><strong>Verified low-NSC feeds in our library:</strong> Triple Crown Lite (9.3%), Nutrena SafeChoice Special Care, Triple Crown Low Starch (13.5%), Buckeye Safe N Easy Pelleted (12.5%), Buckeye Safe N Easy Senior (~12%).</p>
+  </div>
+
+  <hr class="guide-divider" />
+
+  <!-- STEP 5 -->
+  <div class="guide-step" id="adf-ndf">
+    <div class="guide-step-num">5</div>
+    <h2>ADF and NDF — understanding fiber quality</h2>
+
+    <p>These two measurements describe the fiber in a feed and are required on all AAFCO-compliant horse feed labels. They sound technical but they tell you something simple: <strong>how digestible the feed is, and how much gut fill it provides.</strong></p>
+
+    <p><strong>ADF (Acid Detergent Fiber)</strong> measures cellulose and lignin — the least digestible fractions. Higher ADF = lower energy content. Hay with ADF above 45% is mature, stemmy, and poor quality. In commercial feeds, ADF above 20–25% indicates significant forage character.</p>
+
+    <p><strong>NDF (Neutral Detergent Fiber)</strong> measures all structural fiber: cellulose, hemicellulose, and lignin. NDF is always higher than ADF. Higher NDF means more gut fill, more chewing time, more saliva production, and greater time for fermentation. For horses with ulcers or digestive issues, higher NDF is a positive.</p>
+
+    <div class="guide-callout callout-green">
+      <strong>A useful rule of thumb:</strong> If ADF is above 20% and NDF is above 35%, the feed has significant forage character and can partially replace hay. If ADF is below 12% and NDF is below 25%, it is primarily a concentrate — hay is still essential.
+    </div>
+  </div>
+
+  <hr class="guide-divider" />
+
+  <!-- STEP 6 -->
+  <div class="guide-step" id="selenium">
+    <div class="guide-step-num">6</div>
+    <h2>Selenium — the narrow safe range</h2>
+
+    <p>Selenium is the one trace mineral where <strong>more is not better</strong>. The margin between adequate and toxic is narrower for selenium than any other nutrient in horse feeding. Deficiency causes white muscle disease; toxicity (selenosis) causes hair loss from the mane and tail, horizontal cracking of the hooves, and in severe cases, death.</p>
+
+    <p>Selenium is expressed in <strong>ppm</strong> (parts per million, equivalent to mg/kg). To calculate how much your horse gets from a feed:</p>
+
+    <div class="guide-label-example" style="font-family:inherit;">
+      <strong>Daily selenium from feed (mg) = ppm × (lbs fed ÷ 2.2)</strong>
+      <br><br>
+      Example: 0.3 ppm selenium, feeding 4 lbs/day:<br>
+      0.3 × (4 ÷ 2.2) = 0.3 × 1.82 = <strong>0.55 mg from this feed</strong>
+      <br><br>
+      Add hay contribution (~0.003 mg/kg hay × hay kg fed) and any supplements.<br>
+      <strong>Total from all sources must stay below 2 mg/day.</strong>
+    </div>
+
+    <p><strong>Selenium sources on labels:</strong></p>
+    <ul style="font-size:0.93rem;line-height:1.8;color:#3D3D38;margin-bottom:14px;">
+      <li><strong>Sodium selenite</strong> — inorganic form. Absorbed and used immediately but doesn't build tissue reserves well.</li>
+      <li><strong>Selenium yeast / Selenomethionine</strong> — organic form. Incorporated into muscle tissue, builds better long-term reserves. Preferred form for horses without daily pasture access.</li>
+    </ul>
+
+    <p>Regional soil selenium varies dramatically — Pacific Northwest and Northeast US are deficient; parts of Wyoming, South Dakota, and Nebraska can be toxic. Know your region.</p>
+  </div>
+
+  <hr class="guide-divider" />
+
+  <!-- STEP 7 -->
+  <div class="guide-step" id="vitamins">
+    <div class="guide-step-num">7</div>
+    <h2>Vitamins A, D, and E</h2>
+
+    <p>These three fat-soluble vitamins are stored in body fat and liver — which means they can accumulate to toxic levels if oversupplemented from multiple sources. Read them as a system, not individually.</p>
+
+    <table class="guide-table">
+      <thead><tr><th>Vitamin</th><th>What it does</th><th>Key concern</th><th>Daily need (1,100lb horse)</th></tr></thead>
+      <tbody>
+        <tr>
+          <td>Vitamin E</td>
+          <td>Antioxidant. Muscle health, immune function, nerve health. Lowest in hay — horses without pasture are frequently deficient.</td>
+          <td>Natural d-alpha-tocopherol is 2–3× more bioavailable than synthetic dl-alpha-tocopherol. Same IU label ≠ same effect.</td>
+          <td>500 IU/day maintenance; 1,000+ IU/day without pasture</td>
+        </tr>
+        <tr>
+          <td>Vitamin A</td>
+          <td>Vision, immune function, reproduction. Horses at pasture synthesize from beta-carotene in grass.</td>
+          <td>Can accumulate to toxic levels. Don't stack multiple fortified feeds + supplements. Hay loses beta-carotene during storage.</td>
+          <td>15,000 IU/day; 22,500 IU/day for pregnant mares</td>
+        </tr>
+        <tr>
+          <td>Vitamin D</td>
+          <td>Calcium absorption, bone mineralization. Horses synthesize from sunlight. Horses with outdoor access usually adequate.</td>
+          <td>Most toxic fat-soluble vitamin when oversupplemented — causes soft tissue calcification. Stacking feeds is a real risk.</td>
+          <td>3,300 IU/day; more for horses without sunlight</td>
+        </tr>
+      </tbody>
+    </table>
+
+    <div class="guide-callout callout-red">
+      <strong>Vitamin stacking warning:</strong> If you feed two fully fortified concentrates plus a vitamin supplement, you may be delivering 3–4× the required Vitamin A and D. Both are fat-soluble and accumulate. Use one fortified feed or a ration balancer — not multiple.
+    </div>
+  </div>
+
+  <hr class="guide-divider" />
+
+  <!-- STEP 8 -->
+  <div class="guide-step" id="calcium-phosphorus">
+    <div class="guide-step-num">8</div>
+    <h2>Calcium and Phosphorus — the ratio that matters</h2>
+
+    <p>The Ca:P ratio (calcium to phosphorus) is one of the most critical mineral relationships in equine nutrition. The target across the total diet is <strong>1.5 to 2:1 calcium to phosphorus.</strong></p>
+
+    <p>An <strong>inverted ratio</strong> — where phosphorus exceeds calcium — triggers nutritional secondary hyperparathyroidism. The horse's parathyroid gland detects low blood calcium and mobilizes calcium from bone to compensate. Over time this causes skeletal fragility, facial swelling ("big head disease"), and poor bone density.</p>
+
+    <div class="guide-label-example" style="font-family:inherit;">
+      <strong>How to check the Ca:P ratio on a label:</strong>
+      <br><br>
+      Calcium (min) = 0.80% &nbsp;|&nbsp; Phosphorus (min) = 0.50%<br>
+      Ratio = 0.80 ÷ 0.50 = <span class="label-highlight">1.6:1 ✓ Good</span>
+      <br><br>
+      Calcium (min) = 0.40% &nbsp;|&nbsp; Phosphorus (min) = 0.60%<br>
+      Ratio = 0.40 ÷ 0.60 = <span class="label-bad">0.67:1 ✗ Inverted — concern</span>
+    </div>
+
+    <p>Note: the Ca:P ratio of the <em>total diet</em> (feed + hay combined) matters, not just the feed alone. Alfalfa hay is calcium-rich; grass hay is more balanced. Grains are phosphorus-heavy. Commercial feeds adjust their Ca:P ratio with limestone and dicalcium phosphate — but adding a plain grain supplement can throw off a well-balanced complete feed.</p>
+  </div>
+
+  <hr class="guide-divider" />
+
+  <!-- STEP 9 -->
+  <div class="guide-step" id="trace-minerals">
+    <div class="guide-step-num">9</div>
+    <h2>Trace minerals — copper, zinc, and manganese</h2>
+
+    <p>These three trace minerals work together for hoof quality, coat health, immune function, and enzyme activity. They also compete with each other for absorption — and with iron, which is frequently excessive in hay and water.</p>
+
+    <table class="guide-table">
+      <thead><tr><th>Mineral</th><th>Daily need</th><th>Form matters?</th><th>Key antagonist</th></tr></thead>
+      <tbody>
+        <tr><td>Copper</td><td>100 mg/day</td><td>Yes — copper proteinate &gt; copper sulfate when iron is high</td><td>Iron. High iron in hay and water blocks copper absorption.</td></tr>
+        <tr><td>Zinc</td><td>400 mg/day</td><td>Yes — zinc proteinate &gt; zinc oxide</td><td>Copper. Maintain Zn:Cu ratio of 3–4:1.</td></tr>
+        <tr><td>Manganese</td><td>400 mg/day</td><td>Modest — proteinate slightly better than oxide</td><td>Iron and calcium at high levels.</td></tr>
+      </tbody>
+    </table>
+
+    <p><strong>When forms matter most:</strong> If your horse's hay or water is high in iron (common in many regions — test to find out), organic forms (proteinates, amino acid complexes) are meaningfully more effective because they resist iron interference during gut absorption. A feed listing only copper sulfate and zinc sulfate in an iron-rich environment may deliver far less copper and zinc than the label suggests.</p>
+  </div>
+
+  <hr class="guide-divider" />
+
+  <!-- STEP 10 -->
+  <div class="guide-step" id="red-flags">
+    <div class="guide-step-num">10</div>
+    <h2>Red flags to look for</h2>
+
+    <div class="guide-callout callout-red">
+      <strong>Molasses in positions #1–#3:</strong> Molasses at the top of the ingredient list is a primary ingredient, not a trace palatability agent. This feed has a significant sugar load. A concern for any horse with metabolic history.
+    </div>
+
+    <div class="guide-callout callout-red">
+      <strong>Grain leading for a metabolic or easy-keeper horse:</strong> Corn, oats, or barley in position #1 or #2 signals a high-starch feed. The NSC will typically be above 20%.
+    </div>
+
+    <div class="guide-callout callout-red">
+      <strong>Selenium above 0.5 ppm:</strong> At normal feeding rates this may deliver 1+ mg selenium from the feed alone. Calculate total daily selenium from all sources before feeding.
+    </div>
+
+    <div class="guide-callout callout-amber">
+      <strong>Urea or non-protein nitrogen:</strong> Horses cannot efficiently use urea as a protein source the way ruminants can. Its presence provides no meaningful protein and at high levels is harmful.
+    </div>
+
+    <div class="guide-callout callout-amber">
+      <strong>No starch or sugar listed separately:</strong> If neither starch nor sugar is guaranteed, you cannot calculate NSC. Ask the manufacturer for tested values before feeding to any horse with metabolic concerns.
+    </div>
+
+    <div class="guide-callout callout-amber">
+      <strong>Inverted Ca:P ratio:</strong> Phosphorus minimum exceeds calcium minimum on the label. In the context of that feed's total use, this may be fine — but verify the full diet Ca:P ratio.
+    </div>
+  </div>
+
+  <hr class="guide-divider" />
+
+  <!-- STEP 11 -->
+  <div class="guide-step" id="what-to-ask">
+    <div class="guide-step-num">11</div>
+    <h2>What to ask the manufacturer</h2>
+
+    <p>Feed labels are required to show guaranteed values — not actual tested values. The actual nutrient content can vary between batches. Most manufacturers have technical staff who can provide:</p>
+
+    <ul style="font-size:0.93rem;line-height:1.8;color:#3D3D38;">
+      <li><strong>Tested NSC value</strong> — the lab-verified result, not a calculated estimate</li>
+      <li><strong>Tested starch and sugar separately</strong> — important if NSC isn't on the label</li>
+      <li><strong>Selenium form</strong> — sodium selenite vs selenium yeast (if not obvious from the ingredient list)</li>
+      <li><strong>Copper and zinc forms</strong> — sulfate vs proteinate (important for horses with known mineral absorption issues)</li>
+      <li><strong>Vitamin E form</strong> — natural d-alpha-tocopherol vs synthetic dl-alpha-tocopherol</li>
+      <li><strong>Feeding trial data</strong> — does this feed have actual horse feeding studies, or is it formulated theoretically?</li>
+      <li><strong>Batch testing frequency</strong> — how often do they verify the feed meets the guaranteed analysis?</li>
+    </ul>
+
+    <p>Quality manufacturers — Triple Crown, Nutrena, Purina, Buckeye, Seminole — all have equine nutritionists available by phone or email. Use them.</p>
+  </div>
+
+  <!-- BOTTOM CTA -->
+  <div class="guide-cta-box">
+    <h3>Put this knowledge to work</h3>
+    <p>Photograph any feed label and get a plain-English breakdown of every ingredient and guaranteed analysis value — instantly.</p>
+    <div class="guide-cta-btns">
+      <a href="index.html" class="guide-cta-btn gcb-primary">&#128247; Decode a Feed Label</a>
+      <a href="matchmaker.html" class="guide-cta-btn gcb-secondary">&#127775; Find the Right Feed</a>
+      <a href="glossary.html" class="guide-cta-btn gcb-secondary">&#128218; Glossary</a>
+    </div>
+  </div>
+
+</div>
+
+<footer class="site-footer">
+  <div class="container footer-inner">
+    <div class="footer-brand"><span class="logo-mark">&#9670;</span> HorseNutritionGuide<span class="logo-dot">.com</span></div>
+    <nav style="margin:10px 0;font-size:0.82rem;">
+      <a href="index.html" style="color:#C5DDD0;margin-right:16px;">Feed Decoder</a>
+      <a href="glossary.html" style="color:#C5DDD0;margin-right:16px;">Glossary</a>
+      <a href="matchmaker.html" style="color:#C5DDD0;margin-right:16px;">Feed Matchmaker</a>
+      <a href="how-to-read-horse-feed-label.html" style="color:#C5DDD0;">Label Reading Guide</a>
+    </nav>
+    <p class="footer-note">Educational content only. Not veterinary advice. Not affiliated with any feed manufacturer.</p>
+    <p class="footer-copy">&copy; 2025 HorseNutritionGuide.com</p>
+  </div>
+</footer>
+
+</body>
+</html>
