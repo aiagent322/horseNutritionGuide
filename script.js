@@ -2578,6 +2578,86 @@ document.addEventListener('DOMContentLoaded', function () {
     setTimeout(runOCR, 400);
   }
 
+  // ── Image preparation for OCR ─────────────────────────────────────────────
+  // Anthropic downscales any image whose long edge exceeds 1568px before it is
+  // tokenized, so a 12MP phone photo and a 1568px one bill identically (both
+  // measured at 1731 input tokens). Sending the full-size file buys nothing and
+  // costs the user upload time on barn LTE — and a 4MB+ JPEG exceeds the
+  // worker's 5.5M base64 character cap and comes back as a 413.
+  // Resizing here is purely a bandwidth/reliability win; accuracy is unchanged.
+  const OCR_MAX_EDGE = 1568;
+  const OCR_JPEG_QUALITY = 0.85;
+
+  function readFileAsBase64(file) {
+    return new Promise((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onload  = e => resolve(e.target.result.split(',')[1]);
+      reader.onerror = () => reject(new Error('Could not read image file.'));
+      reader.readAsDataURL(file);
+    });
+  }
+
+  // createImageBitmap with imageOrientation:'from-image' applies the EXIF
+  // rotation phones write into portrait photos. Drawing to a canvas without it
+  // yields a sideways image, which wrecks OCR accuracy.
+  async function decodeImageForOCR(file) {
+    if (typeof createImageBitmap === 'function') {
+      try {
+        return await createImageBitmap(file, { imageOrientation: 'from-image' });
+      } catch (err) { /* fall through to <img> decode */ }
+    }
+    return await new Promise((resolve, reject) => {
+      const url = URL.createObjectURL(file);
+      const img = new Image();
+      img.onload  = () => { URL.revokeObjectURL(url); resolve(img); };
+      img.onerror = () => { URL.revokeObjectURL(url); reject(new Error('Could not decode image.')); };
+      img.src = url;
+    });
+  }
+
+  // Always resolves. Any failure falls back to sending the original file, so a
+  // browser that cannot resize still gets a working scan.
+  async function prepareImageForOCR(file) {
+    const sendOriginal = async () => ({
+      base64: await readFileAsBase64(file),
+      mediaType: file.type || 'image/jpeg'
+    });
+
+    try {
+      const src = await decodeImageForOCR(file);
+      const w = src.width, h = src.height;
+      if (!w || !h) { if (src.close) src.close(); return sendOriginal(); }
+
+      const maxEdge = Math.max(w, h);
+      if (maxEdge <= OCR_MAX_EDGE) {
+        if (src.close) src.close();
+        return sendOriginal();
+      }
+
+      const scale = OCR_MAX_EDGE / maxEdge;
+      const tw = Math.max(1, Math.round(w * scale));
+      const th = Math.max(1, Math.round(h * scale));
+
+      const canvas = document.createElement('canvas');
+      canvas.width  = tw;
+      canvas.height = th;
+      const ctx = canvas.getContext('2d');
+      if (!ctx) { if (src.close) src.close(); return sendOriginal(); }
+
+      ctx.imageSmoothingEnabled = true;
+      ctx.imageSmoothingQuality = 'high';
+      ctx.drawImage(src, 0, 0, tw, th);
+      if (src.close) src.close();
+
+      const base64 = canvas.toDataURL('image/jpeg', OCR_JPEG_QUALITY).split(',')[1];
+      if (!base64) return sendOriginal();
+
+      return { base64: base64, mediaType: 'image/jpeg' };
+    } catch (err) {
+      return sendOriginal();
+    }
+  }
+
   async function runOCR() {
     if (!selectedFile || isScanning) return;
     isScanning = true;
@@ -2590,15 +2670,10 @@ document.addEventListener('DOMContentLoaded', function () {
     setStatus('Reading your label… this takes about 10 seconds.');
 
     try {
-      // Convert image to base64
-      const base64 = await new Promise((resolve, reject) => {
-        const reader = new FileReader();
-        reader.onload  = e => resolve(e.target.result.split(',')[1]);
-        reader.onerror = () => reject(new Error('Could not read image file.'));
-        reader.readAsDataURL(selectedFile);
-      });
-
-      const mediaType = selectedFile.type || 'image/jpeg';
+      // Downscale before upload — see prepareImageForOCR above
+      const prepared  = await prepareImageForOCR(selectedFile);
+      const base64    = prepared.base64;
+      const mediaType = prepared.mediaType;
 
       // Call Claude API with vision
       const response = await fetch('https://horse-nutrition-ocr.bridleandbit.workers.dev/ocr', {
