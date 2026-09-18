@@ -647,6 +647,19 @@ ul li { margin-bottom: 0.35rem; }
   .analysis-grid { grid-template-columns: 1fr 1fr 1fr; }
 }
 
+/* --- DESKTOP --- */
+@media (min-width: 640px) {
+  .container { padding: 0 24px; }
+}
+
+@media (min-width: 1024px) {
+  .container { max-width: 1140px; padding: 0 32px; }
+  .header-inner { padding: 14px 0; }
+  .hero-mobile { padding: 64px 32px 72px; }
+  .hero-mobile-inner { max-width: 720px; }
+  .scan-tips-inner { max-width: 1076px; }
+}
+
 /* Touch targets — minimum 44px */
 .btn { min-height: 44px; }
 .scan-remove-btn { min-height: 36px; }

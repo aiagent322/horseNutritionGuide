@@ -239,6 +239,19 @@ ul li { margin-bottom: 0.35rem; }
   .js-loading .library-panel { opacity: 0.4; }
   /* Remove loading state once JS runs */
   body:not(.js-loading) { /* normal */ }
+
+/* --- DESKTOP --- */
+@media (min-width: 640px) {
+  .container { padding: 0 24px; }
+}
+
+@media (min-width: 1024px) {
+  .container { max-width: 1140px; padding: 0 32px; }
+  .header-inner { padding: 14px 0; }
+  .hero-mobile { padding: 64px 32px 72px; }
+  .hero-mobile-inner { max-width: 720px; }
+  .scan-tips-inner { max-width: 1076px; }
+}
   </style>
   <link rel="stylesheet" href="styles.css" media="print" onload="this.media='all'" />
   <noscript><link rel="stylesheet" href="styles.css" /></noscript>
