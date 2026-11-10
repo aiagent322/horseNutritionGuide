@@ -2932,6 +2932,30 @@ document.addEventListener('DOMContentLoaded', function () {
 
 })();
 
+// ── "Choose a photo" (library / files) — the camera inputs force the camera on
+// phones (capture="environment"), so these inputs have no capture attribute.
+// Each hands its file to the matching camera input and fires that input's
+// existing change handler, so there is one code path for every scan.
+document.addEventListener('DOMContentLoaded', function () {
+  [['ocrUploadInput', 'ocrFileInput'],
+   ['ocrRetryUploadInput', 'ocrRetryInput'],
+   ['ocrUploadInput2', 'ocrFileInput2']].forEach(function (pair) {
+    const up  = document.getElementById(pair[0]);
+    const tgt = document.getElementById(pair[1]);
+    if (!up || !tgt) return;
+    up.addEventListener('change', function () {
+      if (!this.files || !this.files[0]) return;
+      try {
+        const dt = new DataTransfer();
+        dt.items.add(this.files[0]);
+        tgt.files = dt.files;
+        tgt.dispatchEvent(new Event('change', { bubbles: true }));
+      } catch (e) { console.error('Photo upload failed', e); }
+      this.value = '';
+    });
+  });
+});
+
 // ─────────────────────────────────────────────
 // HORSE PROFILE — selection UI + personalized summary
 // ─────────────────────────────────────────────

@@ -228,3 +228,17 @@ ul li { margin-bottom: 0.35rem; }
   .hero-mobile-inner { max-width: 720px; }
   .scan-tips-inner { max-width: 1076px; }
 }
+
+.upload-link {
+  display: block;
+  text-align: center;
+  font-size: 0.9rem;
+  color: rgba(248,244,238,0.85);
+  text-decoration: underline;
+  text-underline-offset: 3px;
+  cursor: pointer;
+  padding: 10px 8px;
+  margin: -6px auto 12px;
+  -webkit-tap-highlight-color: transparent;
+}
+.upload-link-dark { color: var(--green-mid); margin: 10px auto 0; }

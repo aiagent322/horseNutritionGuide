@@ -253,9 +253,23 @@ ul li { margin-bottom: 0.35rem; }
   .hero-mobile-inner { max-width: 720px; }
   .scan-tips-inner { max-width: 1076px; }
 }
-  </style>
-  <link rel="stylesheet" href="styles.css?v=2" media="print" onload="this.media='all'" />
-  <noscript><link rel="stylesheet" href="styles.css?v=2" /></noscript>
+  
+.upload-link {
+  display: block;
+  text-align: center;
+  font-size: 0.9rem;
+  color: rgba(248,244,238,0.85);
+  text-decoration: underline;
+  text-underline-offset: 3px;
+  cursor: pointer;
+  padding: 10px 8px;
+  margin: -6px auto 12px;
+  -webkit-tap-highlight-color: transparent;
+}
+.upload-link-dark { color: var(--green-mid); margin: 10px auto 0; }
+</style>
+  <link rel="stylesheet" href="styles.css?v=3" media="print" onload="this.media='all'" />
+  <noscript><link rel="stylesheet" href="styles.css?v=3" /></noscript>
 
   <link rel="canonical" href="https://horsenutritionguide.com/" />
   <meta property="og:title" content="Horse Feed Label Decoder | HorseNutritionGuide.com" />
@@ -307,6 +321,10 @@ ul li { margin-bottom: 0.35rem; }
         <span class="camera-label">Photo the Feed Label</span>
         <span class="camera-sub">Tap to open your camera</span>
         <input type="file" id="ocrFileInput" accept="image/*" capture="environment" style="display:none;" />
+      </label>
+      <label class="upload-link" for="ocrUploadInput">
+        or choose a photo from your library
+        <input type="file" id="ocrUploadInput" accept="image/*" style="display:none;" />
       </label>
 
       <p class="hero-mobile-trust">Free &middot; No login &middot; Educational use only</p>
@@ -375,6 +393,10 @@ ul li { margin-bottom: 0.35rem; }
           <label class="btn btn-primary scan-retry-btn" for="ocrRetryInput">
             &#128247; Try Again
             <input type="file" id="ocrRetryInput" accept="image/*" capture="environment" style="display:none;" />
+          </label>
+          <label class="btn btn-secondary scan-retry-btn" for="ocrRetryUploadInput">
+            &#128444; Choose a Photo
+            <input type="file" id="ocrRetryUploadInput" accept="image/*" style="display:none;" />
           </label>
           <button class="btn btn-secondary" id="scanSearchInsteadBtn">&#128218; Search by Feed Name</button>
         </div>
@@ -627,6 +649,10 @@ ul li { margin-bottom: 0.35rem; }
               &#128247; Scan Another Label
               <input type="file" id="ocrFileInput2" accept="image/*" capture="environment" style="display:none;" />
             </label>
+            <label class="upload-link upload-link-dark" for="ocrUploadInput2">
+              or choose a photo from your library
+              <input type="file" id="ocrUploadInput2" accept="image/*" style="display:none;" />
+            </label>
           </div>
         </div>
 
@@ -732,7 +758,7 @@ ul li { margin-bottom: 0.35rem; }
 
   <script src="feed-library.js?v=2" defer></script>
   <script src="ration-builder.js?v=2" defer></script>
-  <script src="script.js?v=3" defer></script>
+  <script src="script.js?v=4" defer></script>
   <script src="auto-linker.js?v=2" defer></script>
 </body>
 </html>
