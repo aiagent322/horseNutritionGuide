@@ -49,61 +49,61 @@
 
     // ── Glossary: health conditions
     { terms: ['Equine Metabolic Syndrome', 'EMS'],
-      href: 'glossary.html#conditions', title: 'EMS — see glossary' },
+      href: '/glossary#conditions', title: 'EMS — see glossary' },
     { terms: ['Insulin Resistance', 'insulin-resistant'],
-      href: 'glossary.html#conditions', title: 'Insulin Resistance — see glossary' },
+      href: '/glossary#conditions', title: 'Insulin Resistance — see glossary' },
     { terms: ['PPID', "Cushing's disease", "Cushing's"],
-      href: 'glossary.html#conditions', title: "Cushing's / PPID — see glossary" },
+      href: '/glossary#conditions', title: "Cushing's / PPID — see glossary" },
     { terms: ['Laminitis', 'laminitic'],
-      href: 'glossary.html#conditions', title: 'Laminitis — see glossary' },
+      href: '/glossary#conditions', title: 'Laminitis — see glossary' },
     { terms: ['PSSM', 'Polysaccharide Storage Myopathy'],
-      href: 'glossary.html#conditions', title: 'PSSM — see glossary' },
+      href: '/glossary#conditions', title: 'PSSM — see glossary' },
     { terms: ['RER', 'Recurrent Exertional Rhabdomyolysis', 'tying-up', 'tying up'],
-      href: 'glossary.html#conditions', title: 'RER / Tying-Up — see glossary' },
+      href: '/glossary#conditions', title: 'RER / Tying-Up — see glossary' },
     { terms: ['EMND', 'Equine Motor Neuron Disease'],
-      href: 'glossary.html#conditions', title: 'EMND — see glossary' },
+      href: '/glossary#conditions', title: 'EMND — see glossary' },
     { terms: ['Hindgut Acidosis'],
-      href: 'glossary.html#conditions', title: 'Hindgut Acidosis — see glossary' },
+      href: '/glossary#conditions', title: 'Hindgut Acidosis — see glossary' },
 
     // ── Glossary: label terms
     { terms: ['NSC', 'Non-Structural Carbohydrates'],
-      href: 'glossary.html#label-terms', title: 'NSC — see glossary' },
+      href: '/glossary#label-terms', title: 'NSC — see glossary' },
     { terms: ['WSC', 'Water-Soluble Carbohydrates'],
-      href: 'glossary.html#label-terms', title: 'WSC — see glossary' },
+      href: '/glossary#label-terms', title: 'WSC — see glossary' },
     { terms: ['ADF', 'Acid Detergent Fiber'],
-      href: 'glossary.html#label-terms', title: 'ADF — see glossary' },
+      href: '/glossary#label-terms', title: 'ADF — see glossary' },
     { terms: ['NDF', 'Neutral Detergent Fiber'],
-      href: 'glossary.html#label-terms', title: 'NDF — see glossary' },
+      href: '/glossary#label-terms', title: 'NDF — see glossary' },
     { terms: ['Ration Balancer'],
-      href: 'glossary.html#label-terms', title: 'Ration Balancer — see glossary' },
+      href: '/glossary#label-terms', title: 'Ration Balancer — see glossary' },
     { terms: ['Complete Feed'],
-      href: 'glossary.html#label-terms', title: 'Complete Feed — see glossary' },
+      href: '/glossary#label-terms', title: 'Complete Feed — see glossary' },
 
     // ── Glossary: nutrients
     { terms: ['Vitamin E', 'd-alpha-tocopherol', 'dl-alpha-tocopherol'],
-      href: 'glossary.html#nutrients', title: 'Vitamin E — see glossary' },
+      href: '/glossary#nutrients', title: 'Vitamin E — see glossary' },
     { terms: ['Vitamin A'],
-      href: 'glossary.html#nutrients', title: 'Vitamin A — see glossary' },
+      href: '/glossary#nutrients', title: 'Vitamin A — see glossary' },
     { terms: ['Selenium', 'Selenium Yeast', 'Sodium Selenite'],
-      href: 'glossary.html#nutrients', title: 'Selenium — see glossary' },
+      href: '/glossary#nutrients', title: 'Selenium — see glossary' },
     { terms: ['Chelated', 'Proteinate', 'chelate'],
-      href: 'glossary.html#nutrients', title: 'Chelated Minerals — see glossary' },
+      href: '/glossary#nutrients', title: 'Chelated Minerals — see glossary' },
     { terms: ['Lysine', 'L-Lysine'],
-      href: 'glossary.html#amino-acids', title: 'Lysine — see glossary' },
+      href: '/glossary#amino-acids', title: 'Lysine — see glossary' },
     { terms: ['Methionine', 'DL-Methionine'],
-      href: 'glossary.html#amino-acids', title: 'Methionine — see glossary' },
+      href: '/glossary#amino-acids', title: 'Methionine — see glossary' },
 
     // ── Glossary: digestion
     { terms: ['hindgut', 'Hindgut'],
-      href: 'glossary.html#digestion', title: 'Hindgut — see glossary' },
+      href: '/glossary#digestion', title: 'Hindgut — see glossary' },
     { terms: ['Volatile Fatty Acids', 'VFAs', 'VFA'],
-      href: 'glossary.html#digestion', title: 'Volatile Fatty Acids — see glossary' },
+      href: '/glossary#digestion', title: 'Volatile Fatty Acids — see glossary' },
     { terms: ['Prebiotic', 'Prebiotics'],
-      href: 'glossary.html#digestion', title: 'Prebiotic — see glossary' },
+      href: '/glossary#digestion', title: 'Prebiotic — see glossary' },
     { terms: ['Probiotic', 'Probiotics'],
-      href: 'glossary.html#digestion', title: 'Probiotic — see glossary' },
+      href: '/glossary#digestion', title: 'Probiotic — see glossary' },
     { terms: ['Yeast Culture'],
-      href: 'glossary.html#digestion', title: 'Yeast Culture — see glossary' },
+      href: '/glossary#digestion', title: 'Yeast Culture — see glossary' },
   ];
 
   // ── Build flat sorted list: longest term first to avoid partial matches
@@ -116,44 +116,44 @@
   FLAT_LINKS.sort(function (a, b) { return b.term.length - a.term.length; });
 
   // ── Apply links to a plain-text or HTML string
-  // Skips content already inside an <a> or <strong> or <code> tag
+  // Single pass over each text chunk so inserted anchors (and their title attributes)
+  // are never matched again. Existing tags and anchor contents are left alone.
+  const LINK_RE = (function () {
+    const alt = FLAT_LINKS.map(function (e) {
+      return e.term.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+    }).join('|');
+    return new RegExp('(?<![\\w/])(' + alt + ')(?![\\w])', 'gi');
+  })();
+  const LINK_BY_TERM = {};
+  FLAT_LINKS.forEach(function (e) {
+    const k = e.term.toLowerCase();
+    if (!LINK_BY_TERM[k]) LINK_BY_TERM[k] = e;     // longest-first order: first entry wins
+  });
+  function isAcronym(term) { return term === term.toUpperCase() && term.length <= 5; }
+
   function autoLink(html) {
     if (!html) return html;
-
-    // Split on existing tags to avoid double-linking inside them
-    // Strategy: split into [text, tag, text, tag...] chunks
-    // Only process text chunks
     const chunks = html.split(/(<[^>]+>)/);
     let insideAnchor = false;
 
     return chunks.map(function (chunk) {
-      // It's a tag
       if (chunk.startsWith('<')) {
         if (/^<a[\s>]/i.test(chunk))  insideAnchor = true;
         if (/^<\/a>/i.test(chunk))    insideAnchor = false;
         return chunk;
       }
-      // It's text — skip if inside a link
       if (insideAnchor) return chunk;
 
-      let result = chunk;
-      FLAT_LINKS.forEach(function (entry) {
-        // Word-boundary aware replacement, case-sensitive for acronyms
-        const escaped = entry.term.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-        // For short uppercase acronyms (EMS, NSC etc.) require word boundary
-        // For mixed-case terms, case-insensitive but preserve original
-        const flags = entry.term === entry.term.toUpperCase() && entry.term.length <= 5
-          ? 'g' : 'gi';
-        const re = new RegExp('(?<![\\w/])(' + escaped + ')(?![\\w])', flags);
-        // Only replace FIRST occurrence per term per chunk to avoid spamming links
-        let replaced = false;
-        result = result.replace(re, function (match) {
-          if (replaced) return match;
-          replaced = true;
-          return '<a href="' + entry.href + '" class="auto-link" title="' + entry.title + '" target="_blank">' + match + '</a>';
-        });
+      const used = {};   // first occurrence per term per chunk only
+      return chunk.replace(LINK_RE, function (match) {
+        const entry = LINK_BY_TERM[match.toLowerCase()];
+        if (!entry) return match;
+        if (isAcronym(entry.term) && match !== entry.term) return match;
+        const key = entry.term.toLowerCase();
+        if (used[key]) return match;
+        used[key] = true;
+        return '<a href="' + entry.href + '" class="auto-link" title="' + entry.title + '" target="_blank">' + match + '</a>';
       });
-      return result;
     }).join('');
   }
 

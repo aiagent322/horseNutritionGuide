@@ -245,7 +245,9 @@ const SIGNALS = {
     'beet pulp', 'soybean hulls', 'soybean hull', 'alfalfa meal', 'dehydrated alfalfa',
     'dehydrated alfalfa meal', 'hay meal', 'timothy meal', 'grass meal',
     'oat hulls', 'oat hull', 'oat fiber', 'oat straw', 'cottonseed hull',
-    'alfalfa', 'wheat bran', 'wheat middlings', 'wheat germ'
+    'alfalfa', 'wheat bran', 'wheat middlings', 'wheat germ',
+    'timothy hay', 'timothy', 'teff grass', 'teff', 'bermuda', 'orchard grass', 'alfalfa hay',
+    'hay', 'oat hay', 'orchard grass hay', 'teff grass hay', 'bermuda hay', 'bermuda grass', 'soy hulls', 'soy hull', 'dried beet pulp'
   ],
   // Grain/starch primary sources — matches categorizeIngredient 'starch'
   // NOTE: wheat middlings removed (now fiber), oat groats moved here as starch
@@ -331,29 +333,225 @@ const SIGNALS = {
 //   Dot-fill:  "Crude Protein...Minimum...14.00%"
 // The separator group [^0-9\n]{0,40} matches both.
 // ─────────────────────────────────────────────
+// ─────────────────────────────────────────────
+// LABEL TEXT NORMALIZATION
+// OCR output and pasted text arrive with markdown, dot leaders, bullets and
+// redaction bars. Everything downstream parses the normalized text.
+// ─────────────────────────────────────────────
+// Number: allows thousands commas and leading decimals (".25")
+const NUM = '(\\d{1,3}(?:,\\d{3})+(?:\\.\\d+)?|\\d+(?:\\.\\d+)?|\\.\\d+)';
+// Gap between a label and its value: no digits or newlines. A dot may only appear
+// when it does not start a number, so ".25%" is never read as "25%".
+const GAP = '(?:[^0-9\\n.]|\\.(?!\\d)){0,40}';
+function gaRx(label, unit) { return new RegExp(label + GAP + NUM + '\\s*' + unit, 'i'); }
+function toNum(s) { return parseFloat(String(s).replace(/,/g, '')); }
+
+const NEGATION_RE = /\b[a-z]+-free\b|\bfree\s+of\b|\bno\s+added\b|\bnot\s+added\b|\bnot\s+recommended\b|\bwithout\b|\bdoes\s+not\s+contain\b|\bcontains\s+no\b/i;
+
+function normalizeLabelText(raw) {
+  let t = String(raw || '').replace(/\r/g, '');
+  t = t.replace(/[   ]/g, ' ');
+  t = t.replace(/\*\*|__/g, '');                       // markdown emphasis
+  t = t.replace(/^\s*#{1,6}\s*/gm, '');                // markdown headings
+  t = t.replace(/^\s*[-_=*~]{3,}\s*$/gm, '');          // horizontal rules
+  t = t.replace(/^\s*[•●▪◦]\s*/gm, '');                // bullets
+  t = t.replace(/…/g, ' ');
+  t = t.replace(/\.{2,}/g, ' ');                       // dot leaders
+  t = t.replace(/(^|\s)\.(?=\s)/g, '$1 ');             // spaced dot leaders (". . . .")
+  t = t.replace(/[ \t]+/g, ' ');
+  // Drop sentences that only describe what the product does NOT contain
+  // ("A flax-free formula.", "Salt is not added.") so they are not read as ingredients.
+  t = t.split('\n').map(line => {
+    if (!NEGATION_RE.test(line)) return line;
+    return line.split(/(?<=[.!?])\s+/).filter(s => !NEGATION_RE.test(s)).join(' ');
+  }).join('\n');
+  t = t.split('\n').map(l => l.trim()).join('\n').replace(/\n{3,}/g, '\n\n');
+  return t.trim();
+}
+
+// "AS SAMPLED" / lot-analysis block: values for one tested lot, not guarantees.
+function splitSampled(text) {
+  const lines = text.split('\n');
+  const idx = lines.findIndex(l => /^\s*(?:as[\s-]*sampled|typical\s+analysis|actual\s+analysis|lot\s+analysis|tested\s+analysis)\b/i.test(l));
+  if (idx < 0) return { guaranteed: text, block: '' };
+  let end = idx + 1, seen = false;
+  while (end < lines.length) {
+    const l = lines[end].trim();
+    if (!l) { if (seen) break; end++; continue; }
+    if (!/\d/.test(l)) break;
+    seen = true; end++;
+  }
+  const block = lines.slice(idx + 1, end).join('\n');
+  const guaranteed = lines.slice(0, idx).concat(lines.slice(end)).join('\n');
+  return { guaranteed, block };
+}
+
+function parseSampledBlock(block) {
+  if (!block) return null;
+  const out = {};
+  block.split('\n').forEach(line => {
+    const m = line.match(new RegExp('^\\s*' + NUM + '\\s*(%?)\\s*(.+)$'));
+    if (!m) return;
+    const v = toNum(m[1]), lab = m[3].toLowerCase();
+    if (/crude\s*protein|^protein/.test(lab))        out.protein = v;
+    else if (/crude\s*fat|^fat/.test(lab))           out.fat = v;
+    else if (/crude\s*fiber|^fiber/.test(lab))       out.fiber = v;
+    else if (/\bnsc\b|non[-\s]?structural/.test(lab)) out.nsc = v;
+    else if (/\bwsc\b|sugars?\b/.test(lab))          out.sugar = v;
+    else if (/starch/.test(lab))                     out.starch = v;
+    else if (/\badf\b/.test(lab))                    out.adf = v;
+    else if (/\bndf\b/.test(lab))                    out.ndf = v;
+    else if (/relative\s*feed\s*value|\brfv\b/.test(lab)) out.rfv = v;
+  });
+  return Object.keys(out).length ? out : null;
+}
+
+// ─────────────────────────────────────────────
+// ROW PARSER — handles "Calcium (min) .25% / (max) .7%" and one value per row
+// ─────────────────────────────────────────────
+function rowQualValues(text, labelRe, unit) {
+  const out = [];
+  const valRe = () => new RegExp('(?:\\b(min(?:imum)?|max(?:imum)?)\\b\\.?[^0-9\\n.%]{0,25})?' + NUM + '\\s*' + (unit || '%'), 'gi');
+  text.split('\n').forEach(line => {
+    const m = line.match(labelRe);
+    if (!m) return;
+    let rest = line.slice(m.index + m[0].length).split('|')[0];
+    const stopAt = rest.search(/\b(?!min\b|max\b|minimum\b|maximum\b|avg\b|average\b)[A-Za-z]{3,}/i);
+    if (stopAt >= 0) rest = rest.slice(0, stopAt);
+    const rng = rest.match(new RegExp('^[^0-9.]*' + NUM + '\\s*(?:-|–|to)\\s*' + NUM + '\\s*%'));
+    if (rng) { out.push({ q: 'min', v: toNum(rng[1]) }, { q: 'max', v: toNum(rng[2]) }); return; }
+    const re = valRe();
+    let v;
+    while ((v = re.exec(rest)) !== null) {
+      let q = v[1] ? v[1].toLowerCase().slice(0, 3) : null;
+      if (!q) {
+        const after = rest.slice(v.index + v[0].length).match(/^\s*\(?\s*(min|max)/i);
+        if (after) q = after[1].toLowerCase();
+      }
+      out.push({ q, v: toNum(v[2]) });
+    }
+  });
+  return out;
+}
+
+function summarizeRow(rows, label) {
+  if (!rows.length) return null;
+  const min = rows.find(r => r.q === 'min');
+  const max = rows.find(r => r.q === 'max');
+  const plain = rows.find(r => r.q === null);
+  const base = min || plain || max;
+  const res = { value: base.v, label, qual: base.q };
+  if (max && max !== base) res.max = max.v;
+  return res;
+}
+
+// ─────────────────────────────────────────────
+// INGREDIENT SECTION
+// ─────────────────────────────────────────────
+const ING_STOP_RE = /^\s*(guaranteed|analysis|feeding|directions?|suggested|storage|caution|warning|notice|net\s*w|made\s+(for|in|by)|manufactured|distributed|for\s+all\s+classes|meets\b|full\s+analysis|www\.|call\b|this\s+(product|feed)|important|lot\b|best\s+by)/i;
+
+function getIngredientSection(text) {
+  const lines = String(text || '').split('\n');
+  for (let i = 0; i < lines.length; i++) {
+    const m = lines[i].match(/^\s*(?:list\s+of\s+)?ingredients?\s*(?::|[-–—]\s|$)\s*(.*)$/i);
+    if (!m) continue;
+    const parts = [];
+    let first = m[1] || '';
+    first = first.split(/\s[·•]\s/)[0];            // "Orchard Grass Hay · For all classes of livestock"
+    if (first.trim()) parts.push(first.trim());
+    let j = i + 1;
+    while (j < lines.length) {
+      const l = lines[j].trim();
+      if (!l) { if (parts.length) break; j++; continue; }
+      if (ING_STOP_RE.test(l) || /\d+(?:\.\d+)?\s*%/.test(l)) break;
+      parts.push(l.split(/\s[·•]\s/)[0]);
+      j++;
+    }
+    const sec = parts.join(' ').trim();
+    if (sec) return sec;
+  }
+  return '';
+}
+
+function splitIngredientList(section) {
+  let s = section.replace(/[█▮▓▒░■]+|\[\s*unreadable\s*\]/gi, ' unreadable ingredient ');
+  s = s.replace(/\s+[—–]\s+/g, '-').replace(/\s+/g, ' ');
+  s = s.replace(/\.(?=[A-Z][a-z])/g, '. ');
+  const items = [];
+  let depth = 0, cur = '';
+  for (const ch of s) {
+    if (ch === '(') depth++;
+    if (ch === ')') depth = Math.max(0, depth - 1);
+    if ((ch === ',' || ch === ';') && depth === 0) { items.push(cur); cur = ''; } else cur += ch;
+  }
+  items.push(cur);
+  // "A, B, and C" / "A and B" — split the final item on " and "
+  const last = items.pop() || '';
+  if (/\sand\s/i.test(last) && !/\(/.test(last)) items.push(...last.split(/\s+and\s+/i)); else items.push(last);
+  const seen = new Set();
+  return items
+    .map(x => x.trim().replace(/^and\s+/i, '').split(/\.\s/)[0].replace(/\.$/, '')
+      .replace(/\s*\((?:an?\s+)?(?:preservative|antioxidant)\)/ig, '').trim().toLowerCase())
+    .filter(x => {
+      if (x.length < 3 || /^\d/.test(x)) return false;
+      if (/guaranteed|analysis|feeding|direction|important/.test(x)) return false;
+      if (/\bcrude\b|minimum|maximum|\bmin\b|\bmax\b/.test(x)) return false;
+      if (x.split(' ').length > 10) return false;
+      if (seen.has(x)) return false;
+      seen.add(x); return true;
+    });
+}
+
+function isSeniorProduct(text) {
+  const t = String(text || '');
+  const head = t.split('\n').filter(l => l.trim()).slice(0, 3).filter(l => l.length <= 60).join(' ');
+  return /\bsenior\b/i.test(head) || /\bsenior\s+(?:feed|formula|horses?|complete|blend|diet)\b|\bfor\s+senior\b/i.test(t);
+}
+
+// Everything the decoder needs, computed once from the raw label text
+function buildLabelMeta(raw) {
+  let text = normalizeLabelText(raw);
+  const sp = splitSampled(text);
+  text = sp.guaranteed;
+  const analysis = extractAnalysis(text);
+  const sampled = parseSampledBlock(sp.block);
+  if (sampled) {
+    Object.defineProperty(analysis, '_sampled', { value: sampled, enumerable: false });
+    if (!analysis.nsc && sampled.nsc != null) analysis.nsc = { value: sampled.nsc, label: 'NSC', sampled: true };
+  }
+  const hasIngList = hasIngredientList(text);
+  const ingredients = hasIngList ? parseIngredientOrder(text) : [];
+  return { text, analysis, sampled, hasIngList, ingredients };
+}
+
+
+function dropSubterms(arr) {
+  const a = [...new Set(arr)];
+  return a.filter(t => !a.some(o => o !== t && o.length > t.length && o.includes(t)));
+}
 const ANALYSIS_PATTERNS = [
-  { key: 'protein',    label: 'Crude Protein',   regex: /crude\s*protein[^0-9\n]{0,40}([0-9]+\.?[0-9]*)\s*%/i },
-  { key: 'fat',        label: 'Crude Fat',        regex: /crude\s*fat[^0-9\n]{0,40}([0-9]+\.?[0-9]*)\s*%/i },
-  { key: 'fiber',      label: 'Crude Fiber',      regex: /crude\s*fiber[^0-9\n]{0,40}([0-9]+\.?[0-9]*)\s*%/i },
-  { key: 'calcium',    label: 'Calcium (min)',     regex: /calcium[^0-9\n]{0,40}(?:min[^0-9\n]{0,20})?([0-9]+\.?[0-9]*)\s*%/i },
-  { key: 'phosphorus', label: 'Phosphorus',        regex: /phosphorus[^0-9\n]{0,40}([0-9]+\.?[0-9]*)\s*%/i },
-  { key: 'magnesium',  label: 'Magnesium',         regex: /magnesium[^0-9\n]{0,40}([0-9]+\.?[0-9]*)\s*%/i },
-  { key: 'potassium',  label: 'Potassium',         regex: /potassium[^0-9\n]{0,40}([0-9]+\.?[0-9]*)\s*%/i },
-  { key: 'nsc',        label: 'NSC',               regex: /\bnsc\b[^0-9\n]{0,40}([0-9]+\.?[0-9]*)\s*%/i },
-  { key: 'sugar',      label: 'Sugar',             regex: /(?:water\s*soluble\s*carb|\bwsc\b|\bsugar\b)[^0-9\n]{0,40}([0-9]+\.?[0-9]*)\s*%/i },
-  { key: 'starch',     label: 'Starch',            regex: /\bstarch\b[^0-9\n]{0,40}([0-9]+\.?[0-9]*)\s*%/i },
-  { key: 'adf',        label: 'ADF',               regex: /\badf\b[^0-9\n]{0,40}([0-9]+\.?[0-9]*)\s*%/i },
-  { key: 'ndf',        label: 'NDF',               regex: /\bndf\b[^0-9\n]{0,40}([0-9]+\.?[0-9]*)\s*%/i },
-  { key: 'lysine',     label: 'Lysine',            regex: /\blysine\b[^0-9\n]{0,40}([0-9]+\.?[0-9]*)\s*%/i },
-  { key: 'vitA',       label: 'Vitamin A',         regex: /vitamin\s*a[^0-9\n]{0,40}([0-9]+\.?[0-9]*)\s*iu/i },
-  { key: 'vitD',       label: 'Vitamin D',         regex: /vitamin\s*d[^0-9\n]{0,40}([0-9]+\.?[0-9]*)\s*iu/i },
-  { key: 'vitE',       label: 'Vitamin E',         regex: /vitamin\s*e[^0-9\n]{0,40}([0-9]+\.?[0-9]*)\s*iu/i },
-  { key: 'selenium',   label: 'Selenium',          regex: /selenium[^0-9\n]{0,40}([0-9]+\.?[0-9]*)\s*(?:mg|ppm)/i },
-  { key: 'zinc',       label: 'Zinc',              regex: /\bzinc\b[^0-9\n]{0,40}([0-9]+\.?[0-9]*)\s*(?:mg|ppm)/i },
-  { key: 'copper',     label: 'Copper',            regex: /\bcopper\b[^0-9\n]{0,40}([0-9]+\.?[0-9]*)\s*(?:mg|ppm)/i },
-  { key: 'manganese',  label: 'Manganese',         regex: /manganese[^0-9\n]{0,40}([0-9]+\.?[0-9]*)\s*(?:mg|ppm)/i },
-  { key: 'iron',       label: 'Iron',              regex: /\biron\b[^0-9\n]{0,40}([0-9]+\.?[0-9]*)\s*(?:mg|ppm)/i },
-  { key: 'biotin',     label: 'Biotin',            regex: /biotin[^0-9\n]{0,40}([0-9]+\.?[0-9]*)\s*mg/i }
+  { key: 'protein',    label: 'Crude Protein', regex: gaRx('crude\\s*protein', '%') },
+  { key: 'fat',        label: 'Crude Fat',     regex: gaRx('crude\\s*fat', '%') },
+  { key: 'fiber',      label: 'Crude Fiber',   regex: gaRx('crude\\s*fib(?:er|re)', '%') },
+  { key: 'magnesium',  label: 'Magnesium',     regex: gaRx('magnesium', '%') },
+  { key: 'potassium',  label: 'Potassium',     regex: gaRx('potassium', '%') },
+  { key: 'nsc',        label: 'NSC',           regex: gaRx('(?:\\bnsc\\b|non[-\\s]?structural\\s*carbohydrates?)', '%'),
+                                               alt: new RegExp(NUM + '\\s*%\\s*(?:nsc\\b|non[-\\s]?structural)', 'i') },
+  { key: 'sugar',      label: 'Sugar',         regex: gaRx('(?:water[\\s-]*soluble\\s*carb\\w*|\\bwsc\\b|\\bsugars?\\b)', '%') },
+  { key: 'starch',     label: 'Starch',        regex: gaRx('\\bstarch\\b', '%') },
+  { key: 'adf',        label: 'ADF',           regex: gaRx('(?:\\badf\\b|acid\\s*detergent\\s*fib(?:er|re))', '%') },
+  { key: 'ndf',        label: 'NDF',           regex: gaRx('(?:\\bndf\\b|neutral\\s*detergent\\s*fib(?:er|re))', '%') },
+  { key: 'lysine',     label: 'Lysine',        regex: gaRx('\\blysine\\b', '%') },
+  { key: 'vitA',       label: 'Vitamin A',     regex: gaRx('vitamin\\s*a\\b', 'iu') },
+  { key: 'vitD',       label: 'Vitamin D',     regex: gaRx('vitamin\\s*d3?\\b', 'iu') },
+  { key: 'vitE',       label: 'Vitamin E',     regex: gaRx('vitamin\\s*e\\b', 'iu') },
+  { key: 'selenium',   label: 'Selenium',      regex: gaRx('selenium', '(?:mg|ppm)') },
+  { key: 'zinc',       label: 'Zinc',          regex: gaRx('\\bzinc\\b', '(?:mg|ppm)') },
+  { key: 'copper',     label: 'Copper',        regex: gaRx('\\bcopper\\b', '(?:mg|ppm)') },
+  { key: 'manganese',  label: 'Manganese',     regex: gaRx('manganese', '(?:mg|ppm)') },
+  { key: 'iron',       label: 'Iron',          regex: gaRx('\\biron\\b', '(?:mg|ppm)') },
+  { key: 'iodine',     label: 'Iodine',        regex: gaRx('\\biodine\\b', '(?:mg|ppm)') },
+  { key: 'biotin',     label: 'Biotin',        regex: gaRx('biotin', 'mg') }
 ];
 
 // ─────────────────────────────────────────────
@@ -361,9 +559,17 @@ const ANALYSIS_PATTERNS = [
 // ─────────────────────────────────────────────
 function textLower(str) { return str.toLowerCase(); }
 
-function detectSignals(text, group) {
+const _termReCache = {};
+function termRe(term) {
+  if (!_termReCache[term]) {
+    _termReCache[term] = new RegExp('(?<![a-z])' + term.toLowerCase().replace(/[.*+?^${}()|[\]\\]/g, '\\$&') + '(?:s|es)?(?![a-z])');
+  }
+  return _termReCache[term];
+}
+function detectSignals(text, group, raw) {
   const lower = textLower(text);
-  return SIGNALS[group].filter(term => lower.includes(textLower(term)));
+  const found = SIGNALS[group].filter(term => termRe(term).test(lower));
+  return raw ? found : dropSubterms(found);
 }
 
 function pill(text, caution = false) {
@@ -384,62 +590,71 @@ function ul(items) {
 // nutrient delivery from analysis values
 // ─────────────────────────────────────────────
 function parseFeedingDirections(text, analysis) {
-  // Find feeding directions section
-  const dirIdx = text.search(/feeding\s*directions?/i);
+  // Find the feeding section (directions / guidelines / instructions / recommendations)
+  const hdrRe = /(?:suggested\s+)?feeding\s+(?:directions?|guidelines?|instructions?|recommendations?|rates?)/i;
+  const dirIdx = text.search(hdrRe);
   if (dirIdx < 0) return null;
-  const dirRaw = text.slice(dirIdx + text.slice(dirIdx).match(/feeding\s*directions?[^\n]*/i)[0].length);
-  const dirText = dirRaw.split(/\n\n\n|important:/i)[0].trim();
+  const dirText = text.slice(dirIdx, dirIdx + 1500).split(/\n\s*\n\s*\n|important:|\n\s*(?:storage|guaranteed\s+analysis|ingredients)\b/i)[0].trim();
   if (dirText.length < 10) return null;
 
-  // ── Format 1: "X–Y lbs per 100 lbs body weight" — normalize first
-  const per100Match = dirText.match(/(\d+(?:\.\d+)?)\s*(?:to|-)?\s*(\d+(?:\.\d+)?)\s*(?:lbs?|oz)\s*per\s*100\s*(?:lbs?|pounds?)/i);
-  const ozPer100Match = dirText.match(/(\d+(?:\.\d+)?)\s*(?:to|-)?\s*(\d+(?:\.\d+)?)\s*oz(?:s)?\s*per\s*100/i);
+  const N = '(\\d+(?:\\.\\d+)?|\\.\\d+)';
+  const DASH = '(?:to|-|–|—)';
+  const LB = '(?:lbs?\\.?|pounds?)';
+  const rx = (src, flags) => new RegExp(src, flags || 'i');
+
+  const pctRe     = rx(N + '\\s*%?\\s*(?:' + DASH + '\\s*' + N + '\\s*)?%\\s*(?:of\\s+)?(?:(?:a|the|your)\\s+)?(?:(?:horse|animal)\'?s?\\s+)?body\\s*weight');
+  const per100Re  = rx(N + '\\s*' + LB + '?\\s*(?:' + DASH + '\\s*' + N + '\\s*)?' + LB + '\\s*per\\s*100\\s*' + LB);
+  const ozPer100Re= rx(N + '\\s*(?:' + DASH + '\\s*' + N + '\\s*)?oz\\.?s?\\s*per\\s*100');
+  const totalRe   = rx(N + '\\s*' + LB + '?\\s*' + DASH + '\\s*' + N + '\\s*' + LB, 'gi');
+  const singleRe  = rx(N + '\\s*' + LB + '\\s*(?:per\\s*day|daily|\\/\\s*day|a\\s*day)');
+  const kgRe      = rx(N + '\\s*' + DASH + '\\s*' + N + '\\s*kg');
 
   let minLbs = null, maxLbs = null, midLbs = null, refWeightLbs = 1000;
-  let rateFormat = 'total'; // 'total' = total lbs/day, 'per100' = per 100 lbs BW
+  let rateFormat = 'total';   // 'total' | 'per100' | 'per100oz' | 'pctBW'
+  let rangeCount = 0, alsoTotal = null;
 
-  if (per100Match) {
-    // Rate expressed as lbs per 100 lbs body weight — normalize to 1000-lb horse
-    const minPer100 = parseFloat(per100Match[1]);
-    const maxPer100 = parseFloat(per100Match[2] || per100Match[1]);
+  // Reference horse weight only when the label states one ("a 1000 lb. horse")
+  const refM = dirText.match(/(\d{3,4}(?:,\d{3})?)\s*(?:lbs?\.?|pounds?)\s*(?:adult\s+)?horse/i);
+  if (refM) refWeightLbs = parseFloat(refM[1].replace(',', ''));
+
+  let m;
+  let pctM = null;
+  { const g = new RegExp(pctRe.source, 'gi'); let pm;
+    while ((pm = g.exec(dirText)) !== null) {
+      if (/\bhay\s+(?:at|of)\s*$/i.test(dirText.slice(Math.max(0, pm.index - 20), pm.index))) continue;
+      pctM = pm; break;
+    } }
+  if ((m = pctM)) {
+    const a = parseFloat(m[1]), b = m[2] !== undefined ? parseFloat(m[2]) : a;
+    minLbs = a / 100 * refWeightLbs; maxLbs = b / 100 * refWeightLbs;
+    rateFormat = 'pctBW'; refWeightLbs = 1000;
+    minLbs = a / 100 * refWeightLbs; maxLbs = b / 100 * refWeightLbs;
+    midLbs = (minLbs + maxLbs) / 2;
+    const t = [...dirText.matchAll(totalRe)][0];
+    if (t) alsoTotal = `${t[1]}–${t[2]} lbs/day`;
+  } else if ((m = dirText.match(per100Re))) {
+    const a = parseFloat(m[1]), b = m[2] !== undefined ? parseFloat(m[2]) : a;
     refWeightLbs = 1000;
-    minLbs = (minPer100 / 100) * refWeightLbs;
-    maxLbs = (maxPer100 / 100) * refWeightLbs;
+    minLbs = a / 100 * refWeightLbs; maxLbs = b / 100 * refWeightLbs;
     midLbs = (minLbs + maxLbs) / 2;
     rateFormat = 'per100';
-  } else if (ozPer100Match) {
-    // Rate in oz per 100 lbs — convert oz to lbs (16 oz = 1 lb)
-    const minOzPer100 = parseFloat(ozPer100Match[1]);
-    const maxOzPer100 = parseFloat(ozPer100Match[2] || ozPer100Match[1]);
+  } else if ((m = dirText.match(ozPer100Re))) {
+    const a = parseFloat(m[1]), b = m[2] !== undefined ? parseFloat(m[2]) : a;
     refWeightLbs = 1000;
-    minLbs = (minOzPer100 / 16 / 100) * refWeightLbs;
-    maxLbs = (maxOzPer100 / 16 / 100) * refWeightLbs;
+    minLbs = (a / 16 / 100) * refWeightLbs; maxLbs = (b / 16 / 100) * refWeightLbs;
     midLbs = (minLbs + maxLbs) / 2;
     rateFormat = 'per100oz';
   } else {
-    // ── Format 2: "X–Y lbs daily for a 1,000 lb horse" — standard total/day
-    const lbRangeMatch  = dirText.match(/(\d+(?:\.\d+)?)\s*(?:to|–|-)\s*(\d+(?:\.\d+)?)\s*lbs?/i);
-    const lbSingleMatch = dirText.match(/(\d+(?:\.\d+)?)\s*lbs?\s*(?:per\s*day|daily|\/day)/i);
-    const kgRangeMatch  = dirText.match(/(\d+(?:\.\d+)?)\s*(?:to|–|-)\s*(\d+(?:\.\d+)?)\s*kg/i);
-
-    if (lbRangeMatch) {
-      minLbs = parseFloat(lbRangeMatch[1]);
-      maxLbs = parseFloat(lbRangeMatch[2]);
+    const ranges = [...dirText.matchAll(totalRe)];
+    rangeCount = ranges.length;
+    if (ranges.length) {
+      minLbs = parseFloat(ranges[0][1]); maxLbs = parseFloat(ranges[0][2]);
       midLbs = (minLbs + maxLbs) / 2;
-    } else if (lbSingleMatch) {
-      minLbs = maxLbs = midLbs = parseFloat(lbSingleMatch[1]);
-    } else if (kgRangeMatch) {
-      minLbs = parseFloat(kgRangeMatch[1]) * 2.205;
-      maxLbs = parseFloat(kgRangeMatch[2]) * 2.205;
+    } else if ((m = dirText.match(singleRe))) {
+      minLbs = maxLbs = midLbs = parseFloat(m[1]);
+    } else if ((m = dirText.match(kgRe))) {
+      minLbs = parseFloat(m[1]) * 2.205; maxLbs = parseFloat(m[2]) * 2.205;
       midLbs = (minLbs + maxLbs) / 2;
-    }
-
-    // Extract reference horse weight from directions text
-    const weightMatch = dirText.match(/(\d+(?:,\d+)?)\s*(?:lb|pound|kg|kilogram)/i);
-    if (weightMatch) {
-      refWeightLbs = weightMatch[0].toLowerCase().includes('kg')
-        ? parseFloat(weightMatch[1]) * 2.205
-        : parseFloat(weightMatch[1].replace(',', ''));
     }
   }
 
@@ -447,6 +662,11 @@ function parseFeedingDirections(text, analysis) {
 
   // ── Normalize rate label
   const rateLabel = (() => {
+    const fmt = n => String(Math.round(n * 10) / 10);
+    if (rateFormat === 'pctBW') {
+      const pMin = fmt(minLbs / refWeightLbs * 100), pMax = fmt(maxLbs / refWeightLbs * 100);
+      return `${pMin === pMax ? pMin : pMin + '–' + pMax}% of body weight per day (~${fmt(minLbs)}–${fmt(maxLbs)} lbs/day for a ${refWeightLbs}-lb horse)${alsoTotal ? '; the label also lists ' + alsoTotal : ''}`;
+    }
     if (rateFormat === 'per100') {
       const minP = ((minLbs / refWeightLbs) * 100).toFixed(1);
       const maxP = ((maxLbs / refWeightLbs) * 100).toFixed(1);
@@ -457,8 +677,9 @@ function parseFeedingDirections(text, analysis) {
       const maxOz = ((maxLbs * 16 / refWeightLbs) * 100).toFixed(0);
       return `${minOz === maxOz ? minOz : minOz + '–' + maxOz} oz per 100 lbs body weight (~${minLbs.toFixed(1)}–${maxLbs.toFixed(1)} lbs/day for a ${refWeightLbs}-lb horse)`;
     }
-    if (minLbs === maxLbs) return `${minLbs} lbs/day`;
-    return `${minLbs}–${maxLbs} lbs/day`;
+    const note = rangeCount > 1 ? ' (first range listed — the label gives other ranges by use or workload; check the label)' : '';
+    if (minLbs === maxLbs) return `${minLbs} lbs/day${note}`;
+    return `${minLbs}–${maxLbs} lbs/day${note}`;
   })();
 
   // ── Normalized per-100-lbs rate for comparison (regardless of input format)
@@ -539,7 +760,7 @@ function detectRedFlags(text, ingText, analysis) {
       flags.push({
         level: 'caution',
         title: 'High Iron — Copper and Zinc Values Not Found',
-        detail: `Iron is listed at ${ironPpm} ppm. High iron antagonizes copper and zinc absorption, but copper and zinc values were not found in the pasted text. Ask the manufacturer for the full mineral panel to evaluate the iron-copper-zinc balance.`
+        detail: `Iron is listed at ${ironPpm} ppm. High iron antagonizes copper and zinc absorption, but copper and zinc values were not found on the label. Ask the manufacturer for the full mineral panel to evaluate the iron-copper-zinc balance.`
       });
     }
   }
@@ -553,7 +774,7 @@ function detectRedFlags(text, ingText, analysis) {
     flags.push({
       level: 'caution',
       title: 'Dual Selenium Sources Detected',
-      detail: `Both organic selenium (${hasSelYeast ? 'selenium yeast' : ''}${hasSelProtein ? ' selenium proteinate' : ''}) and inorganic selenium (sodium selenite) are present in the ingredient list. Dual sources are common in commercial feeds, but total daily selenium from all sources — feed, hay, and supplements — must stay below approximately 2 mg/day for most horses. ${seVal ? `This feed lists selenium at ${seVal} ppm.` : 'The ppm value was not detected in the pasted text — ask the manufacturer.'} Selenium toxicity is serious and cumulative.`
+      detail: `Both organic selenium (${hasSelYeast ? 'selenium yeast' : ''}${hasSelProtein ? ' selenium proteinate' : ''}) and inorganic selenium (sodium selenite) are present in the ingredient list. Dual sources are common in commercial feeds, but total daily selenium from all sources — feed, hay, and supplements — must stay below approximately 2 mg/day for most horses. ${seVal ? `This feed lists selenium at ${seVal} ppm.` : 'The ppm value was not detected on the label — ask the manufacturer.'} Selenium toxicity is serious and cumulative.`
     });
   }
 
@@ -568,7 +789,7 @@ function detectRedFlags(text, ingText, analysis) {
     flags.push({
       level: 'critical',
       title: 'Molasses + High NSC',
-      detail: `Molasses is present in the ingredient list and NSC appears to be approximately ${effectiveNSC}%. EMS (Equine Metabolic Syndrome) and PPID (Cushing's disease) both cause impaired insulin regulation — the horse produces excess insulin in response to sugar and starch, which damages hoof tissue and causes laminitis. Molasses is a concentrated sugar source, and this label shows both molasses and elevated NSC at approximately ${effectiveNSC}%. For horses with EMS, PPID, or laminitis history, this combination makes this feed a poor choice. The right feed for those horses is low-NSC: Triple Crown Lite (9.3%), Nutrena SafeChoice Special Care, or Buckeye Safe N Easy (12.5%).`
+      detail: `Molasses is present in the ingredient list and NSC appears to be approximately ${effectiveNSC}%. EMS (Equine Metabolic Syndrome) and PPID (Cushing's disease) both cause impaired insulin regulation — the horse produces excess insulin in response to sugar and starch, which damages hoof tissue and causes laminitis. Molasses is a concentrated sugar source, and this label shows both molasses and elevated NSC at approximately ${effectiveNSC}%. For horses with EMS, PPID, or laminitis history, this combination makes this feed a poor choice. Horses with these conditions need a low-NSC diet (commonly under about 10–12% NSC) — ask the manufacturer for the tested value and talk to your veterinarian.`
     });
   }
 
@@ -633,23 +854,20 @@ function detectRedFlags(text, ingText, analysis) {
   // ── 9. PSSM / tying-up / RER — grain-forward feed flag
   // Horses with PSSM1, PSSM2, RER, or recurrent tying-up
   // need very low starch AND low sugar — grain-forward feeds are problematic
-  const grainIngredients = ingText ? [
-    'corn','maize','oats','barley','wheat','milo','sorghum','grain'
-  ].filter(g => textLower(ingText).includes(g)) : [];
-
   const nscForPSSM  = analysis.nsc    ? analysis.nsc.value    : null;
   const calcNSCPSSM = (analysis.sugar && analysis.starch) ? (analysis.sugar.value + analysis.starch.value) : null;
-  const effectiveNSCPSSM = nscForPSSM || calcNSCPSSM;
+  const effectiveNSCPSSM = nscForPSSM !== null ? nscForPSSM : calcNSCPSSM;
 
-  // Flag if: 2+ grain ingredients in top 5, OR NSC/calculated NSC > 15%
-  const top5Ingredients = (ingText ? ingText.split(',').slice(0,5).join(',') : '');
-  const grainInTop5 = grainIngredients.filter(g => textLower(top5Ingredients).includes(g));
+  // Flag if: 2+ grain ingredients in the first five, OR NSC (listed or calculated) above ~12%
+  const ingListRF   = ingText ? splitIngredientList(ingText) : [];
+  const grainInTop5 = ingListRF.slice(0, 5).filter(i => categorizeIngredient(i) === 'starch');
 
-  if (grainInTop5.length >= 2 || (effectiveNSCPSSM !== null && effectiveNSCPSSM > 15)) {
+  if (grainInTop5.length >= 2 || (effectiveNSCPSSM !== null && effectiveNSCPSSM > 12)) {
     flags.push({
       level: 'critical',
-      title: 'Not Appropriate for PSSM / Tying-Up / RER',
-      detail: `This feed appears to be grain-forward${grainInTop5.length ? ` (${grainInTop5.slice(0,3).join(', ')} detected near the top of the ingredient list)` : ''}${effectiveNSCPSSM ? ` with an NSC of approximately ${effectiveNSCPSSM}%` : ''}. PSSM (Polysaccharide Storage Myopathy) is a genetic muscle condition — affected horses abnormally store glycogen in their muscles, and grain starch feeds that glycogen buildup, causing muscle pain, stiffness, and tying-up episodes. RER (Recurrent Exertional Rhabdomyolysis) is a related muscle condition with the same dietary requirement: very low starch and sugar, below 10% NSC. For a horse that ties up, the right feed is high-fat, high-fiber, very low-starch: Triple Crown Low Starch (13.5% NSC), Buckeye Safe N Easy (12.5%), or Nutrena SafeChoice Special Care — paired with added fat like rice bran or vegetable oil for calories.`    });
+      title: 'Grain-Forward or Higher-NSC — Poor Fit for PSSM / Tying-Up / RER',
+      detail: `This feed appears to be ${grainInTop5.length >= 2 ? 'grain-forward (' + grainInTop5.slice(0,3).join(', ') + ' among the first five ingredients)' : 'higher in sugar and starch'}${effectiveNSCPSSM !== null ? ' with an NSC of approximately ' + effectiveNSCPSSM + '%' : ''}. PSSM (Polysaccharide Storage Myopathy) is a muscle condition in which affected horses store excess glycogen in muscle, and RER (Recurrent Exertional Rhabdomyolysis) is a related tying-up condition. Both are commonly managed with a low-starch, low-sugar diet — NSC at or below roughly 10–12% is a frequently cited target, though guidance varies. Ask the manufacturer for the tested NSC and work out the diet with your veterinarian.`
+    });
   }
 
   // ── 10. EMS/IR horse — high NSC flag independent of molasses
@@ -657,7 +875,7 @@ function detectRedFlags(text, ingText, analysis) {
     flags.push({
       level: 'critical',
       title: 'High NSC — Not for Metabolic Horses',
-      detail: `NSC appears to be approximately ${effectiveNSCPSSM}%. EMS (Equine Metabolic Syndrome) is a condition where the horse's cells stop responding normally to insulin — the body overproduces insulin in response to sugar and starch, and that excess insulin directly damages the laminae inside the hoof wall, causing laminitis. PPID (Cushing's disease) causes the same insulin dysregulation through overproduction of cortisol. Horses with EMS, PPID, or laminitis history need total diet NSC below 10%. For those horses, this feed at ~${effectiveNSCPSSM}% NSC is too high. Better fits: Triple Crown Lite (9.3% NSC), Triple Crown Low Starch (13.5%), Nutrena SafeChoice Special Care, or Buckeye Safe N Easy (12.5%).`
+      detail: `NSC appears to be approximately ${effectiveNSCPSSM}%. EMS (Equine Metabolic Syndrome) is a condition where the horse's cells stop responding normally to insulin — the body overproduces insulin in response to sugar and starch, and that excess insulin directly damages the laminae inside the hoof wall, causing laminitis. PPID (Cushing's disease) causes the same insulin dysregulation through overproduction of cortisol. Horses with EMS, PPID, or laminitis history are commonly kept on a total diet with NSC at or below about 10–12%. For those horses, this feed at ~${effectiveNSCPSSM}% NSC is too high — look for a feed with a lower tested NSC.`
     });
   }
 
@@ -712,7 +930,9 @@ function detectFeedForm(text, ingText) {
   if (/extrud/i.test(text))                                          signals.extruded  = true;
   if (/\bcube\b|\bcubes\b/i.test(text))                            signals.cube      = true;
   if (/crumble/i.test(text))                                         signals.crumble   = true;
-  if (/loose|mash|meal mix|grain mix|sweet feed/i.test(text))        signals.loose     = true;
+  if (/\bloose\b|\bmash\b|meal mix|grain mix|sweet feed/i.test(text)) signals.loose     = true;
+
+  const explicitAny = Object.values(signals).some(Boolean);
 
   // ── Infer textured from ingredient list patterns
   // Whole, cracked, rolled, flaked, steam-flaked = textured
@@ -783,29 +1003,24 @@ function detectFeedForm(text, ingText) {
     label:     info.label     || primary,
     desc:      info.desc      || '',
     digestion: info.digestion || '',
-    caution:   info.caution   || ''
+    caution:   info.caution   || '',
+    inferred:  !explicitAny
   };
 }
 
-function classifyFeedType(text) {
+function classifyFeedType(text, meta) {
   const lower = textLower(text);
   const types = [];
 
   // ── Extract ingredient text for pattern detection
-  const ingSection = (() => {
-    const m = text.match(/ingredients\s*:([\s\S]*?)(?=guaranteed\s*analysis|feeding\s*directions|important:|$)/i);
-    return m ? m[1].toLowerCase() : lower;
-  })();
+  const ingSectionRaw = getIngredientSection(text);
+  const ingSection = ingSectionRaw ? ingSectionRaw.toLowerCase() : lower;
+  const an = (meta && meta.analysis) || extractAnalysis(text);
 
-  // ── Extract crude fiber value if present
-  const fiberMatch = text.match(/crude\s*fiber[^0-9]*([0-9]+\.?[0-9]*)\s*%/i);
-  const crudeFiberPct = fiberMatch ? parseFloat(fiberMatch[1]) : null;
-
-  // ── Extract ADF/NDF values if present (high ADF/NDF = forage-replacing)
-  const adfMatch = text.match(/\badf\b[^0-9]*([0-9]+\.?[0-9]*)\s*%/i);
-  const ndfMatch = text.match(/\bndf\b[^0-9]*([0-9]+\.?[0-9]*)\s*%/i);
-  const adfVal = adfMatch ? parseFloat(adfMatch[1]) : null;
-  const ndfVal = ndfMatch ? parseFloat(ndfMatch[1]) : null;
+  // ── Crude fiber and ADF/NDF values (high ADF/NDF = forage-replacing)
+  const crudeFiberPct = an.fiber ? an.fiber.value : null;
+  const adfVal = an.adf ? an.adf.value : null;
+  const ndfVal = an.ndf ? an.ndf.value : null;
 
   // ── Count fiber-forward ingredients in ingredient section
   const completeFeedFiberIngredients = [
@@ -826,7 +1041,7 @@ function classifyFeedType(text) {
     });
   }
 
-  if (/\bsenior\b/i.test(text)) {
+  if (isSeniorProduct(text)) {
     types.push({
       label: 'Senior Feed',
       confidence: 'high',
@@ -842,8 +1057,23 @@ function classifyFeedType(text) {
     });
   }
 
+  // ── Forage / hay-replacer products: first ingredient is a forage and the list has no grains
+  const ingListFT = ingSectionRaw ? splitIngredientList(ingSectionRaw) : [];
+  const catsFT    = ingListFT.map(categorizeIngredient);
+  const forageFirst = ingListFT.length > 0 && catsFT[0] === 'fiber' && /\b(?:hay|timothy|teff|bermuda|orchard\s*grass|alfalfa|grass|forage)\b/.test(ingListFT[0]);
+  const hasGrainFT  = catsFT.some(c => c === 'starch' || c === 'protein');
+  const earlySugar  = catsFT.slice(0, 2).includes('sugar');
+  const isForageProduct = forageFirst && !hasGrainFT && !earlySugar;
+  if (isForageProduct && !types.some(t => t.label === 'Complete Feed')) {
+    types.push({
+      label: 'Forage / Hay-Replacer Product',
+      confidence: ingListFT.length <= 2 ? 'high' : 'medium',
+      reason: `The first ingredient is a forage (${ingListFT[0]}) and the list contains no grains. This reads as a pelleted or cubed hay product meant to replace some or all of the hay in the diet${ingListFT.length > 2 ? ', with other ingredients added' : ''}. Check the feeding directions for how much to feed and whether it is meant to replace all hay.`
+    });
+  }
+
   // ── PATTERN-BASED: infer complete feed without keyword
-  if (!types.some(t => t.label === 'Complete Feed')) {
+  if (!types.some(t => t.label === 'Complete Feed') && !isForageProduct) {
     const completeFeedSignals = [];
     if (crudeFiberPct !== null && crudeFiberPct >= 18) completeFeedSignals.push(`crude fiber ${crudeFiberPct}% (≥18% is a strong complete feed indicator)`);
     if (fiberIngCount >= 2) completeFeedSignals.push(`${fiberIngCount} forage-type fiber ingredients detected (${completeFeedFiberIngredients.filter(t => ingSection.includes(t)).join(', ')})`);
@@ -873,9 +1103,9 @@ function classifyFeedType(text) {
 
     // Run signals only against ingredient section to avoid false positives
     const ingForCount = completeFeedFiberIngredients.filter(t => ingSection.includes(t)).length;
-    const fiberCount  = detectSignals(ingSection, 'fiberEnergy').length;
-    const grainCount  = detectSignals(ingSection, 'grainStarch').length;
-    const vitCount    = detectSignals(text, 'vitamins').length;
+    const fiberCount  = detectSignals(ingSection, 'fiberEnergy', true).length;
+    const grainCount  = detectSignals(ingSection, 'grainStarch', true).length;
+    const vitCount    = detectSignals(text, 'vitamins', true).length;
 
     if (lsc) types.push({
       label: 'Low-Starch / Controlled-Carbohydrate Feed',
@@ -927,9 +1157,33 @@ function classifyFeedType(text) {
 function extractAnalysis(text) {
   const results = {};
   for (const pat of ANALYSIS_PATTERNS) {
-    const m = text.match(pat.regex);
-    if (m) results[pat.key] = { value: parseFloat(m[1]), label: pat.label };
+    const m = text.match(pat.regex) || (pat.alt ? text.match(pat.alt) : null);
+    if (m) {
+      results[pat.key] = {
+        value: toNum(m[1]),
+        label: pat.label,
+        qual: /\bmax/i.test(m[0]) ? 'max' : (/\bmin/i.test(m[0]) ? 'min' : null)
+      };
+    }
   }
+  // Rows that may carry both a minimum and a maximum
+  const rows = [
+    ['calcium',    'Calcium',    /\bcalcium\b(?!\s*(?:carbonate|propionate|iodate|pantothenate|hydroxide|phosphate|sulfate|chloride))/i],
+    ['phosphorus', 'Phosphorus', /\bphosphorus\b/i],
+    ['sodium',     'Sodium',     /\bsodium\b(?!\s*(?:selenite|chloride|bicarbonate|phosphate|bisulfate))/i],
+    ['salt',       'Salt',       /\bsalt\b(?!\s+(?:is|and|free))/i],
+    ['ash',        'Ash',        /\bash\b/i],
+    ['moisture',   'Moisture',   /\bmoisture\b/i],
+    ['fructans',   'Fructans',   /\bfructans?\b/i],
+    ['omega3',     'Omega-3',    /omega[\s-]*3(?:\s*fatty\s*acids?)?/i],
+    ['omega6',     'Omega-6',    /omega[\s-]*6(?:\s*fatty\s*acids?)?/i]
+  ];
+  rows.forEach(([key, label, re]) => {
+    const r = summarizeRow(rowQualValues(text, re), label);
+    if (r) results[key] = r;
+  });
+  const de = text.match(new RegExp('digestible\\s*energy' + GAP + NUM + '\\s*mcal', 'i'));
+  if (de) results.de = { value: toNum(de[1]), label: 'Digestible Energy' };
   return results;
 }
 
@@ -942,8 +1196,8 @@ function extractAnalysis(text) {
 // ─────────────────────────────────────────────
 function hasIngredientList(text) {
   const lower = textLower(text);
-  // Explicit header
-  if (/ingredients\s*:/i.test(text)) return true;
+  // Explicit header (with or without colon, markdown already stripped)
+  if (getIngredientSection(text)) return true;
   // At least 3 ingredient-list-style terms present
   // (terms that only appear in ingredient lists, not analysis panels)
   const ingredientOnlyTerms = [
@@ -963,9 +1217,8 @@ function hasIngredientList(text) {
 // EXTRACT INGREDIENT-SECTION TEXT ONLY
 // ─────────────────────────────────────────────
 function extractIngredientText(text) {
-  // Isolate ingredients section by header if present
-  const ingMatch = text.match(/ingredients\s*:([\s\S]*?)(?=guaranteed analysis|feeding directions|\n\n\n|$)/i);
-  if (ingMatch) return ingMatch[1];
+  const sec = getIngredientSection(text);
+  if (sec) return sec;
   // No header — strip every line that is an analysis/numeric row
   const analysisTerms = /^\s*(crude|lysine|methionine|threonine|calcium|phosphorus|magnesium|potassium|iron|selenium|zinc|copper|manganese|vitamin|biotin|lactobacillus|saccharomyces|nsc|sugar|starch|salt|sodium|iodine|cobalt)/i;
   const numericLine   = /[\d]+\.?[\d]*\s*(%|ppm|iu\/|mg\/|cfu)/i;
@@ -987,48 +1240,20 @@ function extractIngredientText(text) {
 
 // Parse ingredient list into ordered array
 function parseIngredientOrder(text) {
-  let ingSection = '';
-
-  // Try to find INGREDIENTS: header and take only what follows it
-  const headerMatch = text.match(/ingredients\s*:([\s\S]*?)(?=guaranteed\s*analysis|feeding\s*directions|important:|$)/i);
-  if (headerMatch) {
-    ingSection = headerMatch[1];
-  } else {
-    // No header — use the stripped ingredient text
-    ingSection = extractIngredientText(text);
-    // Additional safety: strip lines that look like product names or headers
-    // (all-caps lines, lines with no comma, lines shorter than 5 chars)
-    ingSection = ingSection
-      .split('\n')
-      .filter(line => {
-        const t = line.trim();
-        if (!t) return false;
-        if (t.length < 4) return false;
-        // Skip lines that are all uppercase (product name / section header)
-        if (t === t.toUpperCase() && /[A-Z]/.test(t)) return false;
-        // Skip lines with numbers followed by % (analysis rows that slipped through)
-        if (/\d+\.?\d*\s*%/.test(t)) return false;
-        return true;
-      })
-      .join(' ');
-  }
-
-  // Split on commas, clean each entry, filter out non-ingredient noise
-  return ingSection
-    .replace(/\n/g, ' ')
-    .replace(/\s+/g, ' ')
-    .split(',')
-    .map(s => s.trim().toLowerCase())
-    .filter(s => {
-      if (s.length < 3) return false;
-      // Skip entries that look like product names, headers, or numbers
-      if (/^\d/.test(s)) return false;                        // starts with number
-      if (/guaranteed|analysis|feeding|direction|important/i.test(s)) return false;
-      if (/crude|minimum|maximum|\bmin\b|\bmax\b/i.test(s)) return false;
-      // Skip entries that are suspiciously long (probably grabbed a sentence)
-      if (s.split(' ').length > 8) return false;
+  const sec = getIngredientSection(text);
+  if (sec) return splitIngredientList(sec);
+  // No header — use the stripped ingredient text, dropping product names and headers
+  const stripped = extractIngredientText(text)
+    .split('\n')
+    .filter(line => {
+      const t = line.trim();
+      if (!t || t.length < 4) return false;
+      if (t === t.toUpperCase() && /[A-Z]/.test(t)) return false;
+      if (/\d+\.?\d*\s*%/.test(t)) return false;
       return true;
-    });
+    })
+    .join(' ');
+  return splitIngredientList(stripped);
 }
 
 // Categorize a single ingredient string
@@ -1052,7 +1277,7 @@ function categorizeIngredient(ing) {
   if (/oat hull|oat fiber|oat straw/.test(i))                       return 'fiber';
   if (/beet pulp/.test(i))                                          return 'fiber';
   if (/alfalfa|dehydrated alfalfa|hay meal|timothy meal|grass meal/.test(i)) return 'fiber';
-  if (/hay/.test(i))                                                return 'fiber';
+  if (/\b(?:hay|timothy|teff|bermuda|orchard\s*grass|bluegrass|brome|fescue|ryegrass|forage|grass)\b/.test(i)) return 'fiber';
 
   // ── Primary grain/starch sources — whole or minimally processed grains
   // Only after all byproduct exceptions have been handled
@@ -1060,18 +1285,18 @@ function categorizeIngredient(ing) {
   if (/(corn|maize)/.test(i) && !/gluten|bran|hominy/.test(i))          return 'starch';
   if (/oat/.test(i) && !/hull|fiber|straw/.test(i))                     return 'starch';
   if (/barley/.test(i))                                                    return 'starch';
-  if (/milo|sorghum|rye/.test(i))                      return 'starch';
+  if (/\bmilo\b|\bsorghum\b|\brye\b/.test(i))                      return 'starch';
   if (/cereal grain|grain product/.test(i))                         return 'starch';
 
   // ── Protein meals
   if (/soybean meal|canola meal|linseed meal|cottonseed meal|sunflower meal/.test(i)) return 'protein';
 
   // ── Fat sources
-  if (/oil|vegetable fat|animal fat|tallow|flaxseed|linseed|stabilized fat/.test(i)) return 'fat';
+  if (/\boil\b|vegetable fat|animal fat|tallow|flaxseed|linseed|stabilized fat/.test(i)) return 'fat';
 
   // ── Minerals macro
   if (/salt|sodium chloride/.test(i))                               return 'salt';
-  if (/limestone|calcium carbonate|dicalcium|monocalcium|phosphate|magnesium oxide|magnesium sulfate/.test(i)) return 'mineral';
+  if (/limestone|calcium carbonate|calcium hydroxide|dicalcium|monocalcium|phosphate|magnesium oxide|magnesium sulfate/.test(i)) return 'mineral';
 
   // ── Vitamins and supplements
   if (/vitamin|supplement|niacin|biotin|riboflavin|thiamine|choline|folic|pyridoxine|pantothenate|menadione|cyanocobalamin/.test(i)) return 'vitamin';
@@ -1081,8 +1306,8 @@ function categorizeIngredient(ing) {
   if (/yeast/.test(i))                                              return 'probiotic';
 
   // ── Trace minerals
-  if (/zinc|copper|manganese|selenium|ferrous|cobalt|iodine|ethylenediamine/.test(i)) return 'trace-mineral';
-  if (/iron/.test(i))                                           return 'trace-mineral';
+  if (/zinc|copper|manganese|selenium|selenite|ferrous|cobalt|iodine|iodate|ethylenediamine/.test(i)) return 'trace-mineral';
+  if (/\biron\b/.test(i))                                           return 'trace-mineral';
 
   // ── Amino acids
   if (/lysine|methionine|threonine|tryptophan|amino acid/.test(i)) return 'amino-acid';
@@ -1091,7 +1316,7 @@ function categorizeIngredient(ing) {
   if (/flavor|palatab/.test(i))                                     return 'flavoring';
 
   // ── Mold inhibitors / preservatives
-  if (/propionic|propionate|mold inhibitor|preservative|antioxidant/.test(i)) return 'preservative';
+  if (/propionic|propionate|mold inhibitor|preservative|antioxidant|citric acid|rosemary|tocopherols|ascorbic acid/.test(i)) return 'preservative';
 
   return 'other';
 }
@@ -1109,10 +1334,16 @@ function analyzeIngredientOrder(text) {
 
   // ── Flag: starch/grain in top 3
   const top3Starch = top3.filter(i => categorizeIngredient(i) === 'starch');
+  const top5Starch = top5.filter(i => categorizeIngredient(i) === 'starch');
   if (top3Starch.length >= 2) {
     flags.push({
       level: 'caution',
       text: `<strong>High-starch ingredients lead the list.</strong> "${top3Starch.join('", "')}" appear among the first three ingredients — meaning they make up the largest portion of this feed by weight. Laminitis is an inflammation of the laminae — the tissue bonding the hoof wall to the coffin bone. High dietary starch and sugar cause insulin spikes; in horses with EMS, PPID/Cushing's, or a history of laminitis, those spikes can trigger laminitic episodes. A fiber-based lead (beet pulp, soybean hulls, alfalfa) is far safer for those horses than grain at the top of the ingredient list.`    });
+  } else if (top5Starch.length >= 2) {
+    flags.push({
+      level: 'caution',
+      text: `<strong>Grain ingredients make up much of the top of the list.</strong> ${top5Starch.map(g => '"' + g + '"').join(', ')} all appear among the first five ingredients — a meaningful starch contribution that matters for horses with insulin resistance, laminitis, or PSSM.`
+    });
   } else if (top3Starch.length === 1) {
     flags.push({
       level: 'note',
@@ -1130,6 +1361,12 @@ function analyzeIngredientOrder(text) {
     flags.push({
       level: 'caution',
       text: `<strong>⚠ "${sugarName}" is ingredient #${sugarPos} — one of the largest components by weight.</strong> Sugar this high in the ingredient list is unusual and indicates a high-sugar formula. Not appropriate for horses with insulin resistance, laminitis, EMS, or PPID/Cushing's.`
+    });
+  } else if (sugarPos >= 2 && ingredients.length <= 4 && sugarPos === ingredients.length) {
+    // Last item of a very short list — smallest component by weight
+    flags.push({
+      level: 'note',
+      text: `<strong>"${sugarName}" is listed last of only ${ingredients.length} ingredients</strong> — the smallest component by weight, likely a binder or palatability aid. It is still a sugar source; ask the manufacturer for the sugar and NSC values.`
     });
   } else if (sugarPos >= 3 && sugarPos <= 5) {
     // Positions 3–5 — meaningful contributor
@@ -1153,10 +1390,15 @@ function analyzeIngredientOrder(text) {
 
   // ── Flag: fiber sources leading (positive signal)
   const top3Fiber = top3.filter(i => categorizeIngredient(i) === 'fiber');
-  if (top3Fiber.length >= 2) {
+  if (top3Fiber.length >= 2 && top5Starch.length >= 2) {
+    flags.push({
+      level: 'note',
+      text: `<strong>Fiber sources lead, but grain follows.</strong> "${top3Fiber.join('", "')}" lead the list, yet ${top5Starch.map(g => '"' + g + '"').join(', ')} also appear in the first five ingredients. This is a mixed fiber-and-grain formula, not a low-starch feed.`
+    });
+  } else if (top3Fiber.length >= 2) {
     flags.push({
       level: 'positive',
-      text: `<strong>Fiber sources lead the ingredient list.</strong> "${top3Fiber.join('", "')}" appear among the first three ingredients — a positive signal. This feed appears to derive most of its energy from digestible fiber rather than grain starch, which is easier on the hindgut and more appropriate for metabolic horses.`
+      text: `<strong>Fiber sources lead the ingredient list.</strong> "${top3Fiber.join('", "')}" appear among the first three ingredients — a positive signal. This feed appears to derive most of its energy from digestible fiber rather than grain starch, which is easier on the hindgut.`
     });
   }
 
@@ -1169,7 +1411,7 @@ function analyzeIngredientOrder(text) {
         level: 'caution',
         text: `<strong>"${firstIng}" is the first ingredient</strong> — meaning it's present in the largest amount by weight. This is a starch/grain-primary feed.`
       });
-    } else if (cat === 'fiber') {
+    } else if (cat === 'fiber' && top5Starch.length < 2) {
       flags.push({
         level: 'positive',
         text: `<strong>"${firstIng}" is the first ingredient</strong> — the largest component by weight is a fiber source, which is a favorable characteristic for hindgut health.`
@@ -1241,28 +1483,29 @@ function buildIntroSummary(text, analysis, feedTypes, feedForm, fiberFound, grai
   // ── What kind of feed is this
   const primaryType = feedTypes && feedTypes[0] ? feedTypes[0].label : 'horse feed';
   const formDesc = feedForm ? feedForm.label.toLowerCase() : '';
-  const formNote = formDesc ? ` in ${formDesc} form` : '';
+  const formNote = formDesc ? (feedForm.inferred ? ` (likely ${formDesc}, though the label does not say)` : ` in ${formDesc} form`) : '';
 
   // ── Primary energy character — the most important thing
   const fiberLead  = fiberFound && fiberFound.length >= 2 && (!grainFound || grainFound.length <= 1);
   const grainLead  = grainFound && grainFound.length >= 2 && (!fiberFound || fiberFound.length <= 1);
   const mixedEnergy = grainFound && fiberFound && grainFound.length >= 1 && fiberFound.length >= 1;
 
-  const hasMolasses = /molasses/i.test(t);
-  const hasBeetPulp = /beet pulp/i.test(t);
-  const hasAlfalfa  = /alfalfa/i.test(t);
-  const hasSoyHulls = /soybean hull/i.test(t);
-  const hasRiceBran = /rice bran/i.test(t);
-  const hasFlax     = /flax|linseed/i.test(t);
-  const hasCorn     = /corn/i.test(t);
-  const hasOats     = /oats/i.test(t);
+  const ti = getIngredientSection(t) || t;   // the ingredient list when present, otherwise the whole label
+  const hasMolasses = /molasses/i.test(ti);
+  const hasBeetPulp = /beet pulp/i.test(ti);
+  const hasAlfalfa  = /alfalfa/i.test(ti);
+  const hasSoyHulls = /soy(?:bean)?\s*hull/i.test(ti);
+  const hasRiceBran = /rice bran/i.test(ti);
+  const hasFlax     = /flax|linseed/i.test(ti);
+  const hasCorn     = /corn/i.test(ti);
+  const hasOats     = /oats/i.test(ti);
+  const isForageType = !!(feedTypes && feedTypes[0] && /^Forage/i.test(feedTypes[0].label));
 
-  // NSC
-  const nscM  = t.match(/nsc[^0-9]{0,20}(\d+\.?\d*)/i);
-  const stM   = t.match(/starch[^0-9]{0,20}(\d+\.?\d*)\s*%/i);
-  const suM   = t.match(/sugar[^0-9]{0,20}(\d+\.?\d*)\s*%/i);
-  const nscVal = nscM ? parseFloat(nscM[1]) :
-                 (stM && suM ? parseFloat(stM[1]) + parseFloat(suM[1]) : null);
+  // NSC — from the parsed analysis (listed, as sampled, or calculated from sugar + starch)
+  const nscListed = analysis && analysis.nsc ? analysis.nsc.value : null;
+  const nscCalc   = analysis && analysis.starch && analysis.sugar ? analysis.starch.value + analysis.sugar.value : null;
+  const nscVal    = nscListed !== null ? nscListed : nscCalc;
+  const nscM      = nscListed !== null;
 
   const cpVal  = analysis && analysis.protein ? analysis.protein.value : null;
   const fatVal = analysis && analysis.fat ? analysis.fat.value : null;
@@ -1299,7 +1542,9 @@ function buildIntroSummary(text, analysis, feedTypes, feedForm, fiberFound, grai
     opener = 'This is a <strong>' + primaryType + '</strong>' + formNote + '.';
   }
 
-  if (feedForm && feedForm.primary === 'pelleted') {
+  if (feedForm && feedForm.inferred) {
+    // form not stated on the label — make no claims about it
+  } else if (feedForm && feedForm.primary === 'pelleted') {
     opener += ' Pellets are consistent, dust-free, and resist sorting — what you feed is what gets eaten.';
   } else if (feedForm && feedForm.primary === 'textured') {
     opener += ' The textured form allows horses to sort ingredients — monitor that the whole ration is being consumed.';
@@ -1309,7 +1554,9 @@ function buildIntroSummary(text, analysis, feedTypes, feedForm, fiberFound, grai
   sentences.push(opener);
 
   // ── What it does — energy story
-  if (fiberLead) {
+  if (isForageType && (!grainFound || !grainFound.length)) {
+    sentences.push(`The energy in this product comes from <strong>forage fiber</strong>${fiberFound && fiberFound.length ? ' (' + fiberFound.slice(0, 2).join(' and ') + ')' : ''}, which the horse's hindgut microbes ferment into usable energy. There are no grains in the ingredient list.`);
+  } else if (fiberLead) {
     const fiberNames = (fiberFound || []).slice(0, 2).join(' and ');
     let fiberSentence = `The energy in this feed comes primarily from <strong>digestible fiber</strong>`;
     if (fiberNames) fiberSentence += ` — specifically ${fiberNames}`;
@@ -1334,16 +1581,18 @@ function buildIntroSummary(text, analysis, feedTypes, feedForm, fiberFound, grai
     fatSent += ` Fat provides 2.25× more energy per gram than carbohydrates, making this feed calorie-efficient for hard keepers, performance horses, or horses that need extra condition without extra grain.`;
     sentences.push(fatSent);
   } else if (fatVal !== null && fatVal < 4) {
-    sentences.push(`Crude fat is <strong>${fatVal}%</strong> — low. Despite any performance marketing on the packaging, this is not a fat-based energy feed.`);
+    sentences.push(`Crude fat is <strong>${fatVal}%</strong> — low${/performance/i.test(t) ? '. Despite the performance wording on the packaging, this is not a fat-based energy feed' : '; this is not a fat-based energy feed'}.`);
   }
 
   // ── Protein
   if (cpVal !== null) {
-    const isSenior    = /senior/i.test(t);
+    const isSenior    = isSeniorProduct(t);
     const isBalancer  = /ration balancer/i.test(t);
     const isGrowing   = /foal|growing|weanling|yearling/i.test(t);
     let protSent = `Crude protein is <strong>${cpVal}%</strong>.`;
-    if (isBalancer) {
+    if (isForageType) {
+      protSent = `Crude protein is <strong>${cpVal}%</strong> (the guaranteed minimum for this forage product).`;
+    } else if (isBalancer) {
       protSent += ` High crude protein % is expected in ration balancers — they're fed in small amounts (1–2 lbs/day), so actual daily protein delivery is moderate. This is a concentrated vitamin, mineral, and amino acid supplement, not a high-protein bulk feed.`;
     } else if (isGrowing) {
       protSent += cpVal >= 14 ? ` Appropriate for a growing horse, which needs more protein per pound of body weight than a mature horse.` : ` On the lower end for a growing horse — most nutritionists recommend 14–16% for foals and yearlings.`;
@@ -1357,14 +1606,14 @@ function buildIntroSummary(text, analysis, feedTypes, feedForm, fiberFound, grai
 
   // ── NSC / metabolic impact sentence
   if (nscVal !== null) {
-    const nscSource = nscM ? 'listed on the label' : 'calculated from the listed sugar and starch values';
+    const nscSource = nscM ? (analysis.nsc.sampled ? 'as sampled on one tested lot' : 'listed on the label') : 'calculated from the listed sugar and starch values';
     let nscSent = `The NSC (non-structural carbohydrates — sugar + starch combined) is <strong>approximately ${nscVal}%</strong> (${nscSource}).`;
     if (nscVal <= 10) {
       nscSent += ` This is low-NSC — a good fit for easy keepers, horses with laminitis history, or horses that do poorly on high-starch diets.`;
     } else if (nscVal <= 15) {
       nscSent += ` This is moderate. Use caution with insulin-sensitive horses and verify this fits within their total daily NSC budget.`;
     } else {
-      nscSent += ` This is elevated. Metabolic horses typically need diets below 10–12% NSC. EMS, PPID/Cushing's, laminitis-prone, and PSSM horses all do best below 10% NSC. For those horses, look instead at Triple Crown Lite (9.3% NSC), Triple Crown Low Starch (13.5%), Nutrena SafeChoice Special Care, or Buckeye Safe N Easy (12.5%).`;
+      nscSent += ` This is elevated. Metabolic horses are commonly kept on diets below about 10–12% NSC. EMS, PPID/Cushing's, laminitis-prone, and PSSM horses are generally advised to stay at the low end of that range. For those horses, look for a feed with a lower tested NSC.`;
     }
     sentences.push(nscSent);
   } else if (hasMolasses && (grainLead || mixedEnergy)) {
@@ -1381,8 +1630,8 @@ function buildIntroSummary(text, analysis, feedTypes, feedForm, fiberFound, grai
   if (hasAlfalfa) effects.push("alfalfa's calcium and protein buffering the gastric environment");
   if (hasBeetPulp || hasSoyHulls) effects.push('fermentable fiber supporting a stable hindgut microbiome');
   if (hasRiceBran || hasFlax || (fatVal !== null && fatVal >= 8)) effects.push('fat sources promoting coat shine and sustained energy without starch spikes');
-  if (/yeast culture|lactobacillus|saccharomyces/i.test(t)) effects.push('digestive support ingredients to maintain hindgut health under stress or dietary change');
-  if (/biotin/i.test(t)) effects.push('biotin to support hoof horn synthesis over the coming months');
+  if (/yeast culture|lactobacillus|saccharomyces/i.test(ti)) effects.push('digestive support ingredients to maintain hindgut health under stress or dietary change');
+  if (/biotin/i.test(ti)) effects.push('biotin to support hoof horn synthesis over the coming months');
   if (vitEVal !== null && vitEVal >= 200) effects.push(`${vitEVal} IU/lb of Vitamin E — important for muscle and immune health, especially for horses without daily pasture access`);
 
   if (effects.length >= 2) {
@@ -1394,10 +1643,15 @@ function buildIntroSummary(text, analysis, feedTypes, feedForm, fiberFound, grai
   return sentences.join(' ');
 }
 
-function decodeLabel(text) {
-
-  const hasIngList  = hasIngredientList(text);
+function decodeLabel(rawText) {
+  const meta        = buildLabelMeta(rawText);
+  const text        = meta.text;
+  const hasIngList  = meta.hasIngList;
   const ingText     = hasIngList ? extractIngredientText(text) : '';
+  // Vitamin / mineral / digestive signals come from the ingredient list and the numeric
+  // analysis rows, never from marketing prose elsewhere on the bag.
+  const gaLines     = text.split('\n').filter(l => /\d/.test(l)).join('\n');
+  const sigSrc      = hasIngList ? ingText + '\n' + gaLines : text;
 
   // Run ingredient signals ONLY against ingredient text, not full text
   // This prevents "crude fat", "crude fiber" from triggering fat/fiber signals
@@ -1409,14 +1663,14 @@ function decodeLabel(text) {
 
   // Vitamins, minerals, digestive support can legitimately appear in analysis panel
   // but still run against full text — we handle false positives in output logic
-  const mineralFound = detectSignals(text, 'minerals');
-  const vitaminFound = detectSignals(text, 'vitamins');
-  const digestFound  = detectSignals(text, 'digestive');
+  const mineralFound = detectSignals(sigSrc, 'minerals');
+  const vitaminFound = detectSignals(sigSrc, 'vitamins');
+  const digestFound  = detectSignals(sigSrc, 'digestive');
   const hoofFound    = hasIngList ? detectSignals(ingText, 'hoofCoat') :
                        detectSignals(text, 'hoofCoat'); // biotin/zinc/copper show in analysis too
 
-  const feedTypes          = classifyFeedType(text);
-  const analysis           = extractAnalysis(text);
+  const feedTypes          = classifyFeedType(text, meta);
+  const analysis           = meta.analysis;
   const ingredientOrderFlags = hasIngList ? analyzeIngredientOrder(text) : [];
   const ingredientOrderHTML  = renderIngredientOrderHTML(ingredientOrderFlags);
   const feedForm             = detectFeedForm(text, ingText);
@@ -1433,6 +1687,12 @@ function decodeLabel(text) {
        </div>`
     : '';
 
+  // ── Label says livestock, never horse
+  const livestockOnly = /all\s+classes\s+of\s+livestock|\blivestock\b/i.test(text) && !/\bhorses?\b|\bequine\b/i.test(text);
+  const speciesNote = livestockOnly
+    ? `<div style="background:#FBF0DC;border:1px solid rgba(200,130,26,0.3);border-radius:6px;padding:10px 14px;margin-bottom:12px;font-size:0.85rem;color:#5C3A1A;"><strong>&#9888; This label says it is for livestock and never mentions horses.</strong> Confirm with the manufacturer that it is intended for horses.</div>`
+    : '';
+
   // ── Feed Type
   const feedFormHTML = feedForm ? (() => {
     const cautionBlock = feedForm.caution
@@ -1440,7 +1700,7 @@ function decodeLabel(text) {
       : '';
     return `<div style="background:#F8F4EE;border:1px solid rgba(200,182,154,0.35);border-radius:6px;padding:12px 14px;margin-top:14px;">
       <div style="font-size:0.72rem;font-weight:700;letter-spacing:0.1em;text-transform:uppercase;color:#C8821A;margin-bottom:4px;">Feed Form</div>
-      <strong style="color:#1C3A2F">${feedForm.label}</strong><br>
+      <strong style="color:#1C3A2F">${feedForm.label}${feedForm.inferred ? ' <em style="font-weight:400">(not stated on the label — inferred from the ingredient names)</em>' : ''}</strong><br>
       <span style="font-size:0.85rem;color:#3D3D38">${feedForm.desc}</span><br><br>
       <span style="font-size:0.85rem;color:#3D3D38"><strong>Digestion note:</strong> ${feedForm.digestion}</span>
       ${cautionBlock}
@@ -1450,12 +1710,17 @@ function decodeLabel(text) {
   // ── Ingredient list completeness signal
   let ingCompletenessHTML = '';
   if (hasIngList) {
-    const ingList       = parseIngredientOrder(text);
+    const ingList       = meta.ingredients;
     const ingCount      = ingList.length;
     const feedTypeLbl   = feedTypes[0]?.label || '';
-    const isComplexFeed = /performance|senior|complete|balancer|sport|endurance/i.test(feedTypeLbl + text);
+    const isForageFeed  = /^Forage/i.test(feedTypeLbl);
+    const isComplexFeed = !isForageFeed && /performance|senior|complete|balancer|sport|endurance/i.test(feedTypeLbl + ' ' + text);
 
-    if (ingCount < 5 && isComplexFeed) {
+    if (isForageFeed && ingCount <= 2) {
+      ingCompletenessHTML = `<div style="background:#F2F7F4;border:1px solid rgba(61,122,94,0.2);border-radius:6px;padding:8px 12px;margin-top:12px;font-size:0.81rem;color:#2D5C47;">
+        <strong>&#10003;</strong> ${ingCount === 1 ? 'Single-ingredient' : ingCount + '-ingredient'} forage product (${ingList.join(', ')}). A short list is expected here.
+      </div>`;
+    } else if (ingCount < 5 && isComplexFeed) {
       ingCompletenessHTML = `<div style="background:#FBF0DC;border:1px solid rgba(200,130,26,0.25);border-radius:6px;padding:9px 13px;margin-top:12px;font-size:0.83rem;color:#5C3A1A;">
         <strong>&#9888; Short ingredient list for a ${feedTypeLbl}.</strong> Only ${ingCount} ingredient${ingCount !== 1 ? 's' : ''} detected. A formulated feed of this type typically contains 15–40+ ingredients. This may mean the full ingredient list was not included — paste the complete label for the best analysis.
       </div>`;
@@ -1470,7 +1735,7 @@ function decodeLabel(text) {
     }
   }
 
-  const feedTypeHTML = noIngBanner + feedTypes.map(ft =>
+  const feedTypeHTML = noIngBanner + speciesNote + feedTypes.map(ft =>
     `<strong>${ft.label}</strong> <em>(${ft.confidence} confidence)</em><br><span style="font-size:0.88rem">${ft.reason}</span>`
   ).join('<br><br>') + feedFormHTML + ingCompletenessHTML;
 
@@ -1597,7 +1862,7 @@ function decodeLabel(text) {
   // ── Sugar ingredient signals from ingredient list
   if (hasIngList && sugarFound.length) {
     // Build position-aware molasses note
-    const ingList       = parseIngredientOrder(text);
+    const ingList       = meta.ingredients;
     const sugarIngreds  = ingList.filter(i => categorizeIngredient(i) === 'sugar');
     const sugarPosition = sugarIngreds.length ? ingList.indexOf(sugarIngreds[0]) + 1 : 0;
     const sugarIngName  = sugarIngreds.length ? sugarIngreds[0] : sugarFound[0];
@@ -1613,19 +1878,23 @@ function decodeLabel(text) {
       posNote = ` — listed at position #${sugarPosition} (trace amount near end of list, minimal sugar contribution expected).`;
     }
 
+    if (ingList.length <= 4 && sugarPosition === ingList.length && sugarPosition >= 2) {
+      posNote = ` — listed last of only ${ingList.length} ingredients (the smallest component by weight).`;
+    }
     sugarWarnings.push(`Sugar/palatability ingredients detected: ${sugarFound.map(s => pill(s, true)).join(' ')}${posNote}`);
   }
 
   // ── NSC: listed directly
   if (nscVal !== null) {
-    sugarWarnings.push(nscRiskNote(nscVal, '(listed on label)'));
+    sugarWarnings.push(nscRiskNote(nscVal, analysis.nsc && analysis.nsc.sampled ? '(as sampled on one tested lot — not a guarantee)' : '(listed on label)'));
     if (sugarVal !== null) sugarWarnings.push(`Sugar: ${sugarVal}% (max) as listed.`);
     if (starchVal !== null) sugarWarnings.push(`Starch: ${starchVal}% (max) as listed.`);
 
   // ── NSC: calculate from sugar + starch if both listed
   } else if (sugarVal !== null && starchVal !== null) {
     const calcNSC = Math.round((sugarVal + starchVal) * 10) / 10;
-    sugarWarnings.push(`<strong>NSC not listed — calculated from label values:</strong> Sugar (${sugarVal}%) + Starch (${starchVal}%) = <strong>~${calcNSC}% NSC</strong>`);
+    const bothMax = analysis.sugar.qual === 'max' && analysis.starch.qual === 'max';
+    sugarWarnings.push(`<strong>NSC not listed — calculated from label values:</strong> Sugar (${sugarVal}%) + Starch (${starchVal}%) = <strong>~${calcNSC}% NSC</strong>${bothMax ? ' <em>(both are label maximums, so actual NSC is at or below this)</em>' : ''}`);
     sugarWarnings.push(nscRiskNote(calcNSC, '(calculated: sugar + starch)'));
     sugarWarnings.push(`<em style="font-size:0.82rem;color:#888">Note: Calculated NSC may differ slightly from a laboratory-tested value. Some feeds test lower due to processing. Ask the manufacturer for the actual tested NSC value to confirm.</em>`);
 
@@ -1640,15 +1909,15 @@ function decodeLabel(text) {
 
   // ── NSC: nothing listed — use ingredient order signals to give qualitative estimate
   } else {
-    const ingFlags = hasIngList ? ingredientOrderFlags : [];
-    const hasGrainLead  = ingFlags.some(f => f.level === 'caution' && f.text.includes('starch'));
-    const hasFiberLead  = ingFlags.some(f => f.level === 'positive');
+    const cats5 = meta.ingredients.slice(0, 5).map(categorizeIngredient);
+    const hasGrainLead  = cats5.filter(c => c === 'starch').length >= 2;
+    const hasFiberLead  = !hasGrainLead && categorizeIngredient(meta.ingredients[0] || '') === 'fiber';
     const hasSugarIngredient = hasIngList && sugarFound.length > 0;
 
-    if (hasGrainLead && hasSugarIngredient) {
+    if (hasGrainLead) {
       sugarWarnings.push(`<div style="background:#FDF3EE;border:1px solid rgba(139,46,0,0.2);border-radius:6px;padding:10px 13px;font-size:0.88rem;color:#8B2E00;">
         <strong>⚠ NSC not listed — ingredient signals suggest this may be a higher-NSC feed.</strong><br>
-        Grain ingredients lead the list and sugar ingredients are present. For horses with metabolic conditions, ask the manufacturer for tested NSC, sugar, and starch values before feeding.
+        Grain ingredients make up much of the top of the list${hasSugarIngredient ? ' and sugar ingredients are present' : ''}. For horses with metabolic conditions, ask the manufacturer for tested NSC, sugar, and starch values before feeding.
       </div>`);
     } else if (hasFiberLead && !hasSugarIngredient) {
       sugarWarnings.push(`<div style="background:#E8F2ED;border:1px solid rgba(61,122,94,0.25);border-radius:6px;padding:10px 13px;font-size:0.88rem;color:#1C3A2F;">
@@ -1666,22 +1935,22 @@ function decodeLabel(text) {
   // ── Vitamins & Minerals — expanded detection
   // Additional minerals not in signal list that appear in analysis panels
   const extraMinerals = [];
-  if (/magnesium/i.test(text)) extraMinerals.push('magnesium');
-  if (/potassium/i.test(text)) extraMinerals.push('potassium');
-  if (/manganese/i.test(text)) extraMinerals.push('manganese');
-  if (/iron/i.test(text))      extraMinerals.push('iron');
-  if (/iodine/i.test(text))    extraMinerals.push('iodine');
-  if (/cobalt/i.test(text))    extraMinerals.push('cobalt');
+  if (/\bmagnesium\b/i.test(sigSrc)) extraMinerals.push('magnesium');
+  if (/\bpotassium\b/i.test(sigSrc)) extraMinerals.push('potassium');
+  if (/\bmanganese\b/i.test(sigSrc)) extraMinerals.push('manganese');
+  if (/\biron\b/i.test(sigSrc))      extraMinerals.push('iron');
+  if (/\biodine\b/i.test(sigSrc))    extraMinerals.push('iodine');
+  if (/\bcobalt\b/i.test(sigSrc))    extraMinerals.push('cobalt');
 
   const extraVitamins = [];
-  if (/vitamin\s*c/i.test(text))  extraVitamins.push('vitamin c');
-  if (/vitamin\s*b/i.test(text))  extraVitamins.push('vitamin b complex');
-  if (/lysine/i.test(text))       extraVitamins.push('lysine');
-  if (/methionine/i.test(text))   extraVitamins.push('methionine');
-  if (/threonine/i.test(text))    extraVitamins.push('threonine');
+  if (/vitamin\s*c\b/i.test(sigSrc))  extraVitamins.push('vitamin c');
+  if (/vitamin\s*b/i.test(sigSrc))  extraVitamins.push('vitamin b complex');
+  if (/lysine/i.test(sigSrc))       extraVitamins.push('lysine');
+  if (/methionine/i.test(sigSrc))   extraVitamins.push('methionine');
+  if (/threonine/i.test(sigSrc))    extraVitamins.push('threonine');
 
-  const allVitamins  = [...new Set([...vitaminFound, ...extraVitamins])];
-  const allMinerals  = [...new Set([...mineralFound, ...extraMinerals])];
+  const allVitamins  = dropSubterms([...vitaminFound, ...extraVitamins]);
+  const allMinerals  = dropSubterms([...mineralFound, ...extraMinerals]);
 
   let vitHTML = '';
   if (allVitamins.length || allMinerals.length) {
@@ -1853,9 +2122,11 @@ function decodeLabel(text) {
     const yeastNames    = ['saccharomyces','yeast culture','dried yeast','brewer'];
     const prebioticNames= ['mannan','fructooligosaccharide','fos','mos','inulin','prebiotic'];
 
+    const bacillusFerment = /bacillus\s+subtilis\s+fermentation\s+product/i.test(ing);
     digestFound.forEach(d => {
       const dl = d.toLowerCase();
-      if (bacteriaNames.some(b => dl.includes(b)))  probioticBacteria.push(d);
+      if (bacillusFerment && dl.includes('bacillus'))  yeastIngredients.push(d);   // fermentation product, not a live culture
+      else if (bacteriaNames.some(b => dl.includes(b)))  probioticBacteria.push(d);
       else if (yeastNames.some(y => dl.includes(y))) yeastIngredients.push(d);
       else if (prebioticNames.some(p => dl.includes(p))) prebioticIngredients.push(d);
       else yeastIngredients.push(d); // default to yeast category
@@ -1883,6 +2154,7 @@ function decodeLabel(text) {
 
     if (yeastIngredients.length) {
       let yeastNote = `<strong>Yeast / fermentation products:</strong> ${yeastIngredients.join(', ')}. `;
+      if (bacillusFerment) yeastNote += 'The label lists a <em>Bacillus subtilis fermentation product</em> — the by-product of culturing the bacteria, not a guaranteed live culture. Ask the manufacturer whether live organisms (CFU) are guaranteed. ';
       if (ing.includes('saccharomyces cerevisiae') || ing.includes('yeast culture')) {
         yeastNote += 'Saccharomyces cerevisiae yeast culture is a well-researched digestive support ingredient. It acts as a prebiotic — supporting existing hindgut bacteria and fiber fermentation efficiency — rather than introducing live organisms. ';
         yeastNote += 'Dried yeast culture (not live yeast) survives pelleting and extrusion better than live bacteria.';
@@ -1924,7 +2196,7 @@ function decodeLabel(text) {
       const biotinVal = analysis.biotin ? analysis.biotin.value : null;
       const biotinNote = biotinVal
         ? `<strong>Biotin:</strong> ${biotinVal} mg/lb detected. Biotin is the most research-supported ingredient for hoof wall quality. Studies suggest horses with poor hoof quality may benefit from 15–20 mg/day total — at this level${biotinVal * 4 >= 15 ? ', a typical 4-lb feeding provides approximately ' + Math.round(biotinVal * 4) + ' mg/day' : ', a 4-lb feeding provides approximately ' + Math.round(biotinVal * 4) + ' mg/day which may be below the research threshold of 15–20 mg/day'}. Results typically take 6–12 months to appear in new hoof growth.`
-        : '<strong>Biotin</strong> detected in the ingredient list — the most research-supported ingredient for hoof wall quality. Paste the guaranteed analysis for mg/lb value. Results typically take 6–12 months to appear in new hoof growth.';
+        : '<strong>Biotin</strong> detected in the ingredient list — the most research-supported ingredient for hoof wall quality. The mg/lb amount was not found on the label. Results typically take 6–12 months to appear in new hoof growth.';
       sections.push(biotinNote);
     }
 
@@ -1951,10 +2223,10 @@ function decodeLabel(text) {
     // Overall strength assessment
     const supportScore = (hasBiotin ? 2 : 0) + (hasOmega ? 2 : 0) + (hasMethionine ? 1 : 0) + (hasChelate ? 1 : 0);
     let strengthNote = '';
-    if (supportScore >= 4) {
+    if (supportScore >= 4 && (!hasBiotin || analysis.biotin)) {
       strengthNote = '<br><em style="font-size:0.82rem;color:#2D5C47">This feed has a strong hoof and coat support profile — biotin, omega-3s, and/or methionine are all present. Horses with active hoof concerns may not need additional targeted supplementation on top of this feed.</em>';
     } else if (supportScore >= 2) {
-      strengthNote = '<br><em style="font-size:0.82rem;color:#6B6B64">Moderate hoof and coat support detected. Horses with active hoof wall issues or coat problems may benefit from additional targeted supplementation.</em>';
+      strengthNote = '<br><em style="font-size:0.82rem;color:#6B6B64">' + (hasBiotin && !analysis.biotin ? 'Biotin is listed but no amount was found on the label, so its contribution cannot be judged. ' : '') + 'Moderate hoof and coat support detected. Horses with active hoof wall issues or coat problems may benefit from additional targeted supplementation.</em>';
     } else {
       strengthNote = '<br><em style="font-size:0.82rem;color:#6B6B64">Limited hoof and coat support ingredients detected. Horses with active hoof wall issues or coat problems may need a targeted supplement.</em>';
     }
@@ -1968,7 +2240,7 @@ function decodeLabel(text) {
   if (analysis.protein) {
     const cpVal = analysis.protein.value;
     // Evaluate protein % against use-case context signals
-    const isSenior      = /senior/i.test(text);
+    const isSenior      = isSeniorProduct(text);
     const isPerformance = /performance|racing|endurance|sport|eventing/i.test(text);
     const isGrowing     = /foal|young horse|weanling|yearling|growing/i.test(text);
     const isLactating   = /lactating|broodmare|nursing|mare and foal/i.test(text);
@@ -2006,7 +2278,7 @@ function decodeLabel(text) {
   if (analysis.fat) {
     const fatVal = analysis.fat.value;
     const fatNote = fatVal < 4
-      ? `Crude Fat: ${fatVal}% (min) — low fat. Despite any "performance" positioning on the label, this feed is not a fat-based energy feed.`
+      ? `Crude Fat: ${fatVal}% (min) — low fat${/performance/i.test(text) ? '. Despite the "performance" wording on the label, this feed is not a fat-based energy feed.' : '; this is not a fat-based energy feed.'}`
       : fatVal >= 12
       ? `Crude Fat: ${fatVal}% (min) — high fat formula. Provides concentrated energy without raising starch or sugar. Appropriate for hard keepers, performance horses, or horses needing calories without grain.`
       : fatVal >= 8
@@ -2015,10 +2287,12 @@ function decodeLabel(text) {
     anNotes.push(fatNote);
   }
   if (analysis.fiber)      anNotes.push(`Crude Fiber: ${analysis.fiber.value}% (max).`);
-  if (analysis.calcium)    anNotes.push(`Calcium: ${analysis.calcium.value}% (min).`);
-  if (analysis.phosphorus) anNotes.push(`Phosphorus: ${analysis.phosphorus.value}% (min).`);
+  const qLabel = a => a.qual === 'max' ? 'max' : 'min';
+  const withMax = a => a.max != null ? ` to ${a.max}% (max)` : '';
+  if (analysis.calcium)    anNotes.push(`Calcium: ${analysis.calcium.value}% (${qLabel(analysis.calcium)})${withMax(analysis.calcium)}.`);
+  if (analysis.phosphorus) anNotes.push(`Phosphorus: ${analysis.phosphorus.value}% (${qLabel(analysis.phosphorus)})${withMax(analysis.phosphorus)}.`);
 
-  if (analysis.calcium && analysis.phosphorus) {
+  if (analysis.calcium && analysis.phosphorus && analysis.calcium.qual !== 'max' && analysis.phosphorus.qual !== 'max') {
     const ratio = (analysis.calcium.value / analysis.phosphorus.value).toFixed(1);
     const ratioFloat = parseFloat(ratio);
     const ratioNote = ratioFloat < 1.5
@@ -2027,7 +2301,9 @@ function decodeLabel(text) {
       ? `Ca:P ratio is approximately ${ratio}:1 — at the low end of the recommended 1.5–2:1 range. Acceptable, but worth monitoring in the total diet context including hay.`
       : ratioFloat <= 2.0
       ? `Ca:P ratio is approximately ${ratio}:1 — within the recommended 1.5–2:1 range. Note: this reflects the feed only, not your horse's total diet including hay.`
-      : `Ca:P ratio is approximately ${ratio}:1 — above the recommended 1.5–2:1 range. High calcium relative to phosphorus is common in alfalfa-heavy feeds and is generally safe but worth noting.`;
+      : (/alfalfa/i.test(ingText || '')
+          ? `Ca:P ratio is approximately ${ratio}:1 (from the minimum values) — above the recommended 1.5–2:1 range. High calcium relative to phosphorus is common in alfalfa-containing feeds; review it against the total diet.`
+          : `Ca:P ratio is approximately ${ratio}:1 (from the minimum values) — above the recommended 1.5–2:1 range. Ratios this far above 2:1 are worth reviewing against the total diet, especially for growing horses.`);
     anNotes.push(ratioNote);
   }
 
@@ -2068,6 +2344,30 @@ function decodeLabel(text) {
   if (analysis.zinc)   extraAnalysis.push(`Zinc: <strong>${analysis.zinc.value} ppm</strong> (min).`);
   if (analysis.copper) extraAnalysis.push(`Copper: <strong>${analysis.copper.value} ppm</strong> (min).`);
 
+  // Additional guaranteed-analysis rows
+  const rowTxt = a => `<strong>${a.value}%</strong> (${qLabel(a)})${withMax(a)}`;
+  if (analysis.sodium)   extraAnalysis.push(`Sodium: ${rowTxt(analysis.sodium)}.`);
+  if (analysis.salt)     extraAnalysis.push(`Salt: ${rowTxt(analysis.salt)}.`);
+  if (analysis.ash)      extraAnalysis.push(`Ash: ${rowTxt(analysis.ash)} — total mineral content.`);
+  if (analysis.moisture) extraAnalysis.push(`Moisture: ${rowTxt(analysis.moisture)}.`);
+  if (analysis.fructans) extraAnalysis.push(`Fructans: ${rowTxt(analysis.fructans)} — a sugar fraction of interest for laminitis-prone horses.`);
+  if (analysis.omega3)   extraAnalysis.push(`Omega-3 fatty acids: ${rowTxt(analysis.omega3)}.`);
+  if (analysis.omega6)   extraAnalysis.push(`Omega-6 fatty acids: ${rowTxt(analysis.omega6)}.`);
+  if (analysis.iodine)   extraAnalysis.push(`Iodine: <strong>${analysis.iodine.value} ppm</strong> (min).`);
+  if (analysis.de)       extraAnalysis.push(`Digestible energy: <strong>${analysis.de.value} Mcal/lb</strong>.`);
+  if (analysis._sampled) {
+    const sm = analysis._sampled;
+    const parts = [];
+    if (sm.protein != null) parts.push(`crude protein ${sm.protein}%`);
+    if (sm.fat != null)     parts.push(`crude fat ${sm.fat}%`);
+    if (sm.fiber != null)   parts.push(`crude fiber ${sm.fiber}%`);
+    if (sm.nsc != null)     parts.push(`NSC ${sm.nsc}%`);
+    if (sm.sugar != null)   parts.push(`sugar ${sm.sugar}%`);
+    if (sm.starch != null)  parts.push(`starch ${sm.starch}%`);
+    if (sm.rfv != null)     parts.push(`relative feed value ${sm.rfv}`);
+    extraAnalysis.unshift(`<strong>As sampled on one tested lot (not a guarantee):</strong> ${parts.join(', ')}. The guaranteed values above are the legal minimums or maximums; sampled values describe this lot only.`);
+  }
+
   // Vitamin C — still direct regex (not in ANALYSIS_PATTERNS, rarely on labels)
   const vitCMatch = text.match(/vitamin\s*c[^0-9\n]{0,30}([0-9]+\.?[0-9]*)\s*mg/i);
   if (vitCMatch) extraAnalysis.push(`Vitamin C: <strong>${vitCMatch[1]} mg/lb</strong> (min) — horses synthesize their own vitamin C, but supplemental amounts may support horses under stress or immune challenge.`);
@@ -2096,7 +2396,7 @@ function decodeLabel(text) {
 
   const analysisHTML = (anNotes.length || extraAnalysis.length)
     ? ul([...anNotes, ...extraAnalysis]) + '<br><small style="color:#888">Values based on text matching — always reference the original label for accuracy.</small>' + feedingDirHTML
-    : 'No guaranteed analysis values detected. Paste the full guaranteed analysis panel for this section to populate.' + feedingDirHTML;
+    : 'No guaranteed analysis values were found on this label. If the tag has a guaranteed analysis panel, rescan or paste that section.' + feedingDirHTML;
 
   // ── Questions to Ask
   const missing = [];
@@ -2109,6 +2409,7 @@ function decodeLabel(text) {
     });
   }
   // ── Dynamic questions — only shown when relevant to what was detected
+  const isPureForage = hasIngList && meta.ingredients.length > 0 && meta.ingredients.length <= 3 && categorizeIngredient(meta.ingredients[0]) === 'fiber' && meta.ingredients.every(i => ['fiber', 'sugar', 'other'].includes(categorizeIngredient(i)));
 
   // Missing ingredient list
   if (!hasIngList) {
@@ -2126,8 +2427,10 @@ function decodeLabel(text) {
   }
 
   // Vitamin E — only ask if IU not found
-  if (!analysis.vitE) {
-    missing.push('Vitamin E IU per pound was not found in the pasted text. Ask the manufacturer for this value — important for horses without regular pasture access.');
+  if (isPureForage) {
+    // single-ingredient forage: vitamin, selenium and probiotic questions do not apply
+  } else if (!analysis.vitE) {
+    missing.push('Vitamin E IU per pound was not found on the label. Ask the manufacturer for this value — important for horses without regular pasture access.');
   } else {
     // If found but form not detected
     const hasVitEForm = /d-alpha|dl-alpha|tocopherol/i.test(text);
@@ -2137,16 +2440,16 @@ function decodeLabel(text) {
   }
 
   // Selenium — ask about source if not identified, or ask about ppm if not found
-  if (!analysis.selenium) {
-    missing.push('Selenium level (ppm) was not found in the pasted text. Ask the manufacturer — selenium has a narrow safe range and total daily intake from all sources matters.');
+  if (!isPureForage && !analysis.selenium) {
+    missing.push('Selenium level (ppm) was not found on the label. Ask the manufacturer — selenium has a narrow safe range and total daily intake from all sources matters.');
   }
   const seSourceKnown = /selenium yeast|sodium selenite|selenium proteinate|selenomethionine/i.test(ingText || text);
-  if (!seSourceKnown) {
+  if (!isPureForage && !seSourceKnown) {
     missing.push('Ask the manufacturer: <em>"Is the selenium in this feed organic (selenium yeast/proteinate) or inorganic (sodium selenite)?"</em> — organic forms are more bioavailable.');
   }
 
   // Digestive support — only ask if not detected
-  if (!digestFound.length) {
+  if (!isPureForage && !digestFound.length) {
     missing.push("No digestive support ingredients (yeast culture, probiotics) detected. Ask whether the feed contains any if hindgut health is a concern for your horse.");
   }
 
@@ -2239,9 +2542,11 @@ function decodeLabel(text) {
       }
 
       // Molasses position — specific
-      const ingList = parseIngredientOrder(text);
+      const ingList = meta.ingredients;
       const molassesIdx = ingList.findIndex(i => /molasses|cane molasses/.test(i));
-      if (molassesIdx >= 0 && molassesIdx <= 4) {
+      if (molassesIdx >= 1 && ingList.length <= 4 && molassesIdx === ingList.length - 1) {
+        sentences.push(`Molasses is listed last of only ${ingList.length} ingredients — the smallest component by weight, likely a binder or palatability aid. It is still a sugar source; ask for the sugar and NSC values if your horse is metabolic.`);
+      } else if (molassesIdx >= 0 && molassesIdx <= 4) {
         sentences.push(`<strong>Molasses appears at position #${molassesIdx + 1}</strong> in the ingredient list — a meaningful sugar contributor. Horses with metabolic conditions typically need low-sugar diets — molasses is a concern for those horses.`);
       } else if (molassesIdx >= 5) {
         sentences.push(`Molasses is present but at position #${molassesIdx + 1} — likely a small amount for palatability.`);
@@ -2283,7 +2588,7 @@ function decodeLabel(text) {
       }
 
       // Closing
-      sentences.push('<br>Ingredient order on labels indicates relative quantity by weight — the first ingredient is present in the largest amount. The ingredient order on labels shows relative quantity by weight — the first ingredient is present in the largest amount.');
+      sentences.push('<br>Ingredient order on labels indicates relative quantity by weight — the first ingredient is present in the largest amount.');
     }
 
     return sentences.filter(Boolean).join(' ');
@@ -2986,23 +3291,24 @@ document.addEventListener('DOMContentLoaded', function () {
     // Detect what we know about the feed from the raw label
     const lower = rawText ? rawText.toLowerCase() : '';
 
-    // NSC situation
-    const nscMatch     = rawText ? rawText.match(/nsc[^0-9]{0,30}([0-9]+\.?[0-9]*)\s*%/i) : null;
-    const sugarMatch   = rawText ? rawText.match(/(?:sugar|wsc)[^0-9]{0,30}([0-9]+\.?[0-9]*)\s*%/i) : null;
-    const starchMatch  = rawText ? rawText.match(/starch[^0-9]{0,30}([0-9]+\.?[0-9]*)\s*%/i) : null;
-    const nscVal       = nscMatch ? parseFloat(nscMatch[1]) : null;
-    const calcNSC      = (sugarMatch && starchMatch) ? parseFloat(sugarMatch[1]) + parseFloat(starchMatch[1]) : null;
-    const effectiveNSC = nscVal || calcNSC;
+    // Everything below comes from the same parsed label the decoder used
+    const meta         = buildLabelMeta(rawText || '');
+    const A            = meta.analysis;
+    const ingCats      = meta.ingredients.map(categorizeIngredient);
+    const starchTop5   = ingCats.slice(0, 5).filter(c => c === 'starch').length;
+    const nscVal       = A.nsc ? A.nsc.value : null;
+    const calcNSC      = (A.sugar && A.starch) ? A.sugar.value + A.starch.value : null;
+    const effectiveNSC = nscVal !== null ? nscVal : calcNSC;
+    const ingLower     = (getIngredientSection(meta.text) || (meta.hasIngList ? '' : lower)).toLowerCase();
 
-    const hasMolasses  = /molasses/i.test(lower);
-    const hasGrainLead = /corn|oats|barley|maize/.test((lower.split(',').slice(0,3).join(',')));
-    const hasFiberLead = /beet pulp|soybean hull|alfalfa/.test((lower.split(',').slice(0,3).join(',')));
-    const hasProbiotic = /lactobacillus|saccharomyces|yeast culture/i.test(lower);
-    const hasBiotin    = /biotin/i.test(lower);
-    const isHighFiber  = /crude fiber[^0-9]{0,30}([0-9]+)/.test(rawText || '') && 
-                         parseFloat((rawText||'').match(/crude fiber[^0-9]{0,30}([0-9]+\.?[0-9]*)/i)?.[1]||0) >= 15;
-    const isSeniorFeed = /senior/i.test(lower);
-    const isCompleteFeed = /complete feed/i.test(lower);
+    const hasMolasses  = ingCats.includes('sugar') || (!meta.hasIngList && /molasses/i.test(lower));
+    const hasGrainLead = starchTop5 >= 2 || ingCats.slice(0, 3).includes('starch');
+    const hasFiberLead = !hasGrainLead && ingCats.slice(0, 3).includes('fiber');
+    const hasProbiotic = /lactobacillus|saccharomyces|yeast culture/i.test(ingLower);
+    const hasBiotin    = /biotin/i.test(ingLower) || !!A.biotin;
+    const isHighFiber  = A.fiber ? A.fiber.value >= 15 : false;
+    const isSeniorFeed = isSeniorProduct(meta.text);
+    const isCompleteFeed = /\bcomplete\s*feed\b/i.test(meta.text);
 
     const hasIR        = health.includes('ir') || health.includes('laminitis') || health.includes('cushings');
     const hasPSSM      = health.includes('pssm');
@@ -3035,7 +3341,7 @@ document.addEventListener('DOMContentLoaded', function () {
         if (effectiveNSC > 12) {
           flags.push({ type: 'caution', text: `NSC is approximately ${effectiveNSC}% — above the recommended 10–12% threshold for insulin-resistant and laminitis-risk horses. Metabolic horses and easy keepers do best below 10–12% NSC — this feed at ~${effectiveNSC}% is on the higher end for those horses.` });
         } else if (effectiveNSC <= 10) {
-          flags.push({ type: 'ok', text: `NSC appears to be ${effectiveNSC}% — within the commonly recommended range for metabolic horses. Ask the manufacturer for the tested (lab-verified) NSC value to confirm — calculated values from starch + sugar are estimates.` });
+          flags.push({ type: 'ok', text: `NSC appears to be ${effectiveNSC}%${A.nsc && A.nsc.sampled ? ' (as sampled on one tested lot)' : ''} — within the commonly recommended range for metabolic horses. Ask the manufacturer for the tested (lab-verified) NSC value to confirm${(A.nsc && !A.nsc.sampled) || !A.nsc ? ' — values calculated from starch + sugar are estimates' : ''}.` });
         } else {
           flags.push({ type: 'warn', text: `NSC appears to be ${effectiveNSC}% — borderline for a horse with insulin resistance or laminitis history. Ask the manufacturer for the exact tested NSC value to decide.` });
         }
@@ -3064,8 +3370,7 @@ document.addEventListener('DOMContentLoaded', function () {
 
     // ── SENIOR HORSE
     if (use === 'senior' || isSeniorFeed) {
-      const cpMatch = rawText ? rawText.match(/crude protein[^0-9]{0,30}([0-9]+\.?[0-9]*)\s*%/i) : null;
-      const cpVal   = cpMatch ? parseFloat(cpMatch[1]) : null;
+      const cpVal   = A.protein ? A.protein.value : null;
       if (isCompleteFeed || isHighFiber) {
         flags.push({ type: 'ok', text: `This appears to be a complete or high-fiber feed — appropriate for a senior horse with reduced ability to chew long-stem hay. Make sure it is introduced gradually and fed in multiple small meals.` });
       }
@@ -3079,8 +3384,7 @@ document.addEventListener('DOMContentLoaded', function () {
 
     // ── PERFORMANCE HORSE
     if (use === 'performance') {
-      const fatMatch = rawText ? rawText.match(/crude fat[^0-9]{0,30}([0-9]+\.?[0-9]*)\s*%/i) : null;
-      const fatVal   = fatMatch ? parseFloat(fatMatch[1]) : null;
+      const fatVal   = A.fat ? A.fat.value : null;
       if (fatVal !== null && fatVal >= 8) {
         flags.push({ type: 'ok', text: `Crude fat is ${fatVal}% — a good energy source for a performance horse. Fat provides sustained energy without the starch spike that grain-heavy feeds can cause.` });
       } else if (fatVal !== null && fatVal < 5) {
@@ -3093,8 +3397,7 @@ document.addEventListener('DOMContentLoaded', function () {
 
     // ── HARD KEEPER / UNDERWEIGHT
     if (isHardKeeper) {
-      const fatMatch = rawText ? rawText.match(/crude fat[^0-9]{0,30}([0-9]+\.?[0-9]*)\s*%/i) : null;
-      const fatVal   = fatMatch ? parseFloat(fatMatch[1]) : null;
+      const fatVal   = A.fat ? A.fat.value : null;
       if (fatVal !== null && fatVal >= 8) {
         flags.push({ type: 'ok', text: `With ${fatVal}% crude fat, this feed has meaningful caloric density — good for a horse that needs to gain weight. Fat adds calories without increasing starch.` });
       } else if (fatVal !== null && fatVal < 5) {
@@ -3133,8 +3436,7 @@ document.addEventListener('DOMContentLoaded', function () {
     }
 
     // ── VITAMIN E — pasture vs no pasture
-    const vitEMatch = rawText ? rawText.match(/vitamin\s*e[^0-9]{0,30}([0-9]+\.?[0-9]*)\s*iu/i) : null;
-    const vitEVal   = vitEMatch ? parseFloat(vitEMatch[1]) : null;
+    const vitEVal   = A.vitE ? A.vitE.value : null;
     if (!hasPasture && vitEVal !== null && vitEVal < 200) {
       flags.push({ type: 'warn', text: `Your horse has limited pasture access and Vitamin E is listed at only ${vitEVal} IU/lb. Without fresh grass, horses frequently become Vitamin E deficient. Consider additional supplementation — especially important for horses with muscle or neurological conditions.` });
     } else if (!hasPasture && vitEVal !== null && vitEVal >= 200) {
@@ -3145,8 +3447,7 @@ document.addEventListener('DOMContentLoaded', function () {
 
     // ── GROWING HORSE
     if (use === 'growing') {
-      const cpMatch = rawText ? rawText.match(/crude protein[^0-9]{0,30}([0-9]+\.?[0-9]*)\s*%/i) : null;
-      const cpVal   = cpMatch ? parseFloat(cpMatch[1]) : null;
+      const cpVal   = A.protein ? A.protein.value : null;
       if (cpVal !== null && cpVal >= 14) {
         flags.push({ type: 'ok', text: `Crude protein is ${cpVal}% — appropriate for a growing horse. Young horses need more protein per pound of body weight than mature horses to support muscle and skeletal development.` });
       } else if (cpVal !== null && cpVal < 14) {
