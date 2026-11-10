@@ -2658,6 +2658,56 @@ document.addEventListener('DOMContentLoaded', function () {
     }
   }
 
+  // ── Cloudflare Turnstile (invisible) ────────────────────────────────────
+  // A fresh single-use token is requested at scan time (tokens expire after
+  // 300s). If it cannot be obtained the scan is still sent without one and the
+  // worker decides — it rejects tokenless requests with a clear message.
+  const TURNSTILE_SITE_KEY = '0x4AAAAAAE8F8eF7Z2v_xv75';
+  let turnstileScriptPromise = null;
+
+  function loadTurnstile() {
+    if (window.turnstile) return Promise.resolve(window.turnstile);
+    if (!turnstileScriptPromise) {
+      turnstileScriptPromise = new Promise(function (resolve, reject) {
+        const el = document.createElement('script');
+        el.src = 'https://challenges.cloudflare.com/turnstile/v0/api.js?render=explicit';
+        el.async = true;
+        el.onload = function () { window.turnstile ? resolve(window.turnstile) : reject(new Error('turnstile missing')); };
+        el.onerror = function () { turnstileScriptPromise = null; reject(new Error('turnstile load failed')); };
+        document.head.appendChild(el);
+      });
+    }
+    return turnstileScriptPromise;
+  }
+
+  function getTurnstileToken() {
+    return loadTurnstile().then(function (ts) {
+      return new Promise(function (resolve, reject) {
+        const holder = document.createElement('div');
+        holder.style.cssText = 'position:fixed;left:-9999px;top:0;';
+        document.body.appendChild(holder);
+        let widgetId = null;
+        const done = function (fn, v) {
+          clearTimeout(timer);
+          try { if (widgetId !== null) ts.remove(widgetId); } catch (e) {}
+          holder.remove();
+          fn(v);
+        };
+        const timer = setTimeout(function () { done(reject, new Error('turnstile timeout')); }, 15000);
+        try {
+          widgetId = ts.render(holder, {
+            sitekey: TURNSTILE_SITE_KEY,
+            execution: 'execute',
+            appearance: 'interaction-only',
+            callback: function (token) { done(resolve, token); },
+            'error-callback': function () { done(reject, new Error('turnstile error')); }
+          });
+          ts.execute(widgetId);
+        } catch (e) { done(reject, e); }
+      });
+    });
+  }
+
   async function runOCR() {
     if (!selectedFile || isScanning) return;
     isScanning = true;
@@ -2675,16 +2725,20 @@ document.addEventListener('DOMContentLoaded', function () {
       const base64    = prepared.base64;
       const mediaType = prepared.mediaType;
 
+      // Invisible bot check; null if it could not be obtained (worker decides)
+      const turnstileToken = await getTurnstileToken().catch(function () { return null; });
+
       // Call Claude API with vision
       const response = await fetch('https://horse-nutrition-ocr.bridleandbit.workers.dev/ocr', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ image: base64, mediaType: mediaType })
+        body: JSON.stringify({ image: base64, mediaType: mediaType, turnstileToken: turnstileToken })
       });
 
       if (!response.ok) {
         const errData = await response.json().catch(() => ({}));
-        throw new Error((errData && errData.error && errData.error.message) || 'API error ' + response.status);
+        const apiErr = errData && errData.error;
+        throw new Error((typeof apiErr === 'string' ? apiErr : (apiErr && apiErr.message)) || 'API error ' + response.status);
       }
 
       const data = await response.json();
