@@ -1,6 +1,6 @@
 HorseNutritionGuide.com — Prototype README
 ==========================================
-Version: 1.1 — OCR Upgrade
+Version: 1.2 — Claude vision OCR via Cloudflare Worker
 
 
 WHAT THIS PROJECT IS
@@ -25,12 +25,11 @@ medical claims. It is educational label interpretation only.
 
 HOW TO OPEN LOCALLY
 --------------------
-1. Unzip the project folder.
-2. Open index.html in any modern web browser (Chrome, Firefox, Safari, Edge).
-3. No server required.
-4. INTERNET ACCESS IS REQUIRED for the OCR feature (Tesseract.js is loaded from
-   CDN: https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.min.js).
-   The paste-label decoder works fully offline without internet.
+1. Serve the folder with any static server (e.g. python3 -m http.server).
+2. Paste-label decoding, saved labels and the glossary work offline.
+3. Photo scanning needs internet: it posts to the OCR worker
+   (repo aiagent322/horse-nutrition-ocr, horse-nutrition-ocr.bridleandbit.workers.dev),
+   which only accepts requests from the production origins.
 
 
 FILES INCLUDED
@@ -49,36 +48,30 @@ The decoder now supports two ways to get feed label text into the tool:
   The original method. Copy the ingredient list, guaranteed analysis, and
   feeding directions from the bag and paste into the textarea. Works offline.
 
-  METHOD 2 — SCAN FEED LABEL (OCR)
-  New in v1.1. Upload a photo of your feed label. The site uses Tesseract.js
-  to run optical character recognition (OCR) directly in the browser. The
-  extracted text is placed into the textarea for review before decoding.
+  METHOD 2 — SCAN FEED LABEL (PHOTO)
+  Upload or take a photo of the label. The browser downscales it to 1568px,
+  sends it to the OCR worker, which asks Claude (vision) to transcribe the label.
+  The extracted text is placed into the textarea for review before decoding.
+  Saved-label and paste paths run entirely client-side and cost nothing.
 
-  OCR ACCURACY NOTE: OCR can misread small print, ligatures, or compressed
+  OCR ACCURACY NOTE: Transcription can misread small print or compressed
   type. Always review extracted text before clicking Decode Label.
 
-  OCR TIPS for best results:
-    - Use a clear, well-lit photo with no shadows across the label
+  TIPS for best results:
+    - Clear, well-lit photo with no shadows across the label
     - Keep the label flat and the camera parallel to the text
-    - Crop close to the ingredient list and guaranteed analysis panel
-    - Avoid motion blur — hold the camera steady or use a document stand
+    - Fill the frame with the ingredient list and guaranteed analysis panel
+    - Avoid motion blur
 
 
 OCR TECHNICAL DETAILS
 ---------------------
-  Library:      Tesseract.js v5
-  CDN source:   https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.min.js
-  Language:     English (eng)
-  Execution:    100% client-side — runs entirely in the user's browser
-  Internet req: Yes (to load the CDN library and English traineddata on first use)
-  Offline use:  Download tesseract.min.js locally and update the script src path
-  Error handling:
-    - No image selected
-    - File too large (>30 MB)
-    - Non-image file type
-    - Tesseract CDN load failure (network error)
-    - Unreadable image (text too small, blurry, or dark)
-    - Unknown OCR engine error
+  Engine:       Claude (claude-sonnet-4-6) via Cloudflare Worker, POST /ocr
+  Accepted:     image/jpeg, image/png, image/webp (type checked against file bytes)
+  Client:       downscale to 1568px long edge, EXIF rotation applied, JPEG upload
+  Worker limit: 5.5M base64 characters
+  Error handling: no image, non-image file, unsupported type, too large,
+                  rate limited, unreadable image, network failure
 
 
 WHAT THE DECODER LOGIC DOES
@@ -115,41 +108,28 @@ Rule-based JavaScript pattern matching (unchanged from v1.0):
 
 WHAT SHOULD BE BUILT NEXT
 --------------------------
-  1. IMPROVED OCR PIPELINE
-     Current Tesseract.js client-side OCR is a prototype. Upgrade options:
-       a. Google Cloud Vision API — significantly higher accuracy for dense
-          small print on feed labels
-       b. Apple Live Text workflow — integrate on iOS for near-perfect accuracy
-          using Apple's native OCR layer
-       c. Server-side pipeline — upload image to a Node.js or Python endpoint,
-          run OCR server-side, return clean text (removes CDN dependency)
-       d. Claude API multimodal — send the image to Claude claude-sonnet-4-6 with
-          a structured extraction prompt; Claude can identify and transcribe
-          ingredient lists and guaranteed analysis panels with high accuracy
-          even from imperfect photos
-
-  2. LARGER INGREDIENT DATABASE
+  1. LARGER INGREDIENT DATABASE
      The current signal detection covers ~60 ingredients. A full commercial
      feed label database would include 200+ ingredients with category, notes,
      and research citations. Consider a JSON ingredient database.
 
-  3. FEED COMPARISON TOOL
+  2. FEED COMPARISON TOOL
      Allow users to paste and compare two feed labels side by side.
 
-  4. SAVED REPORTS
+  3. SAVED REPORTS
      Allow users to save decoded reports as PDF or printable pages.
      Client-side via browser print CSS or jsPDF.
 
-  5. HORSE GENIUS INTEGRATION
+  4. HORSE GENIUS INTEGRATION
      Long-term: connect to TheHorseGenius.com voice AI device
      (NVIDIA Jetson + RAG) so owners can photograph a label and receive a
      voice-narrated breakdown. The structured ingredient database built here
      becomes the knowledge corpus for the RAG pipeline.
 
-  6. VETERINARIAN / NUTRITIONIST REFERRAL DIRECTORY
+  5. VETERINARIAN / NUTRITIONIST REFERRAL DIRECTORY
      A searchable directory of equine nutritionists by region.
 
-  7. HAY ANALYSIS INTEGRATION
+  6. HAY ANALYSIS INTEGRATION
      Accept hay analysis results (Equi-Analytical or similar labs) and
      combine with the feed label to evaluate total diet.
 
@@ -167,8 +147,8 @@ qualified equine nutritionist before changing feed.
 
 BUILD INFO
 ----------
-  Version:      1.1 — OCR Upgrade
+  Version:      1.2 — Claude vision OCR
   Stack:        HTML5, CSS3, Vanilla JavaScript (ES6+)
-  Dependencies: Tesseract.js v5 (CDN, OCR feature only)
+  Dependencies: none client-side; OCR worker (horse-nutrition-ocr)
   Responsive:   Yes — mobile-first, tested to 320px
   License:      Proprietary — HorseNutritionGuide.com / Western Media Group

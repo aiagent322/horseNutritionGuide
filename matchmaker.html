@@ -11,10 +11,11 @@
 </script>
 
   <meta charset="UTF-8" />
+  <link rel="icon" href="/favicon.svg" type="image/svg+xml" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>Feed Matchmaker — Find the Right Feed for Your Horse</title>
   <meta name="description" content="Enter your horse's weight, workload, and health needs. Get ranked feed recommendations matched to NRC nutritional standards." />
-  <link rel="stylesheet" href="styles.css" />
+  <link rel="stylesheet" href="styles.css?v=2" />
   <style>
     /* ── Matchmaker page styles ── */
     .mm-hero { background: linear-gradient(135deg,#1C3A2F 0%,#2D5C47 100%); padding: 40px 20px 32px; text-align:center; }
@@ -140,8 +141,8 @@
 
 <header class="site-header">
   <div class="container header-inner">
-    <a href="index.html" class="logo"><span class="logo-mark">&#9670;</span>HorseNutritionGuide<span class="logo-dot">.com</span></a>
-    <a href="glossary.html" class="header-link">Glossary</a>
+    <a href="/" class="logo"><span class="logo-mark">&#9670;</span>HorseNutritionGuide<span class="logo-dot">.com</span></a>
+    <a href="/glossary" class="header-link">Glossary</a>
   </div>
 </header>
 
@@ -151,7 +152,7 @@
 </div>
 
 <div class="mm-body">
-  <a href="index.html" class="back-link">&#8592; Back to Feed Decoder</a>
+  <a href="/" class="back-link">&#8592; Back to Feed Decoder</a>
 
   <!-- ── FORM ── -->
   <div class="mm-card">
@@ -268,22 +269,22 @@
     <div style="max-width:560px;margin:0 auto;">
       <div style="color:#1C3A2F;font-size:0.92rem;font-weight:700;margin-bottom:12px;">Already have a label? Decode it for the full breakdown.</div>
       <div style="display:flex;gap:10px;justify-content:center;flex-wrap:wrap;">
-        <a href="index.html" style="padding:10px 20px;background:#1C3A2F;color:#F8F4EE;border-radius:7px;text-decoration:none;font-weight:700;font-size:0.88rem;">&#128247; Decode a Label</a>
-        <a href="glossary.html" style="padding:10px 20px;background:white;border:1.5px solid #C5DDD0;color:#1C3A2F;border-radius:7px;text-decoration:none;font-weight:600;font-size:0.88rem;">&#128218; Glossary</a>
+        <a href="/" style="padding:10px 20px;background:#1C3A2F;color:#F8F4EE;border-radius:7px;text-decoration:none;font-weight:700;font-size:0.88rem;">&#128247; Decode a Label</a>
+        <a href="/glossary" style="padding:10px 20px;background:white;border:1.5px solid #C5DDD0;color:#1C3A2F;border-radius:7px;text-decoration:none;font-weight:600;font-size:0.88rem;">&#128218; Glossary</a>
       </div>
     </div>
   </div>
 <footer class="site-footer">
   <div class="container footer-inner">
     <div class="footer-brand"><span class="logo-mark">&#9670;</span> HorseNutritionGuide<span class="logo-dot">.com</span></div>
-    <nav style="margin:10px 0;font-size:0.82rem;"><a href="index.html" style="color:#C5DDD0;margin-right:16px;">Decoder</a><a href="glossary.html" style="color:#C5DDD0;margin-right:16px;">Glossary</a><a href="matchmaker.html" style="color:#C5DDD0;margin-right:16px;">Matchmaker</a><a href="how-to-read-horse-feed-label.html" style="color:#C5DDD0;margin-right:16px;">Label Guide</a><a href="about.html" style="color:#C5DDD0;">About</a></nav>
+    <nav style="margin:10px 0;font-size:0.82rem;"><a href="/" style="color:#C5DDD0;margin-right:16px;">Decoder</a><a href="/glossary" style="color:#C5DDD0;margin-right:16px;">Glossary</a><a href="/matchmaker" style="color:#C5DDD0;margin-right:16px;">Matchmaker</a><a href="/how-to-read-horse-feed-label" style="color:#C5DDD0;margin-right:16px;">Label Guide</a><a href="/about" style="color:#C5DDD0;">About</a></nav>
     <p class="footer-note">Feed matching is based on NRC 2007 standards and verified label data. Hay contributions are estimates — actual values depend on forage quality. This tool is educational, not a substitute for a complete diet formulation by a qualified equine nutritionist.</p>
     <p class="footer-copy">&copy; 2026 HorseNutritionGuide.com</p>
   </div>
 </footer>
 
-<script src="feed-library.js" defer></script>
-<script src="matchmaker.js" defer></script>
+<script src="feed-library.js?v=2" defer></script>
+<script src="matchmaker.js?v=2" defer></script>
 <script>
 (function() {
   'use strict';

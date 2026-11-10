@@ -1629,3 +1629,11 @@ ul li { margin-bottom: 0.35rem; }
   color: var(--green-deep);
   border-bottom-style: solid;
 }
+
+/* Desktop: keep article heroes and ingredient pages at reading width */
+@media (min-width: 1024px) {
+  .ems-hero .container,
+  .guide-hero .container { max-width: 756px; }
+  .about-hero .container { max-width: 736px; }
+  .ing-page .container { max-width: 820px; }
+}
